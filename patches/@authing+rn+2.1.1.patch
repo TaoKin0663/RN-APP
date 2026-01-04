@@ -1,0 +1,532 @@
+diff --git a/node_modules/@authing/rn/android/build.gradle b/node_modules/@authing/rn/android/build.gradle
+index 99f1a4c..b66fd83 100644
+--- a/node_modules/@authing/rn/android/build.gradle
++++ b/node_modules/@authing/rn/android/build.gradle
+@@ -4,14 +4,8 @@ def safeExtGet(prop, fallback) {
+     rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+ }
+ 
+-buildscript {
+-    repositories {
+-        jcenter()
+-    }
+-    dependencies {
+-        classpath 'com.android.tools.build:gradle:2.2.3'
+-    }
+-}
++// 移除 buildscript 块，使用根项目的 Gradle 插件配置
++// 这样可以避免依赖已废弃的 jcenter，并使用统一的插件版本
+ 
+ android {
+     compileSdkVersion safeExtGet('compileSdkVersion', 23)
+diff --git a/node_modules/@authing/rn/android/build/generated/source/buildConfig/androidTest/debug/com/reactlibrary/test/BuildConfig.java b/node_modules/@authing/rn/android/build/generated/source/buildConfig/androidTest/debug/com/reactlibrary/test/BuildConfig.java
+deleted file mode 100644
+index ff1e9fd..0000000
+--- a/node_modules/@authing/rn/android/build/generated/source/buildConfig/androidTest/debug/com/reactlibrary/test/BuildConfig.java
++++ /dev/null
+@@ -1,10 +0,0 @@
+-/**
+- * Automatically generated file. DO NOT MODIFY
+- */
+-package com.reactlibrary.test;
+-
+-public final class BuildConfig {
+-  public static final boolean DEBUG = Boolean.parseBoolean("true");
+-  public static final String APPLICATION_ID = "com.reactlibrary.test";
+-  public static final String BUILD_TYPE = "debug";
+-}
+diff --git a/node_modules/@authing/rn/android/build/generated/source/buildConfig/debug/com/reactlibrary/BuildConfig.java b/node_modules/@authing/rn/android/build/generated/source/buildConfig/debug/com/reactlibrary/BuildConfig.java
+deleted file mode 100644
+index 4381f65..0000000
+--- a/node_modules/@authing/rn/android/build/generated/source/buildConfig/debug/com/reactlibrary/BuildConfig.java
++++ /dev/null
+@@ -1,10 +0,0 @@
+-/**
+- * Automatically generated file. DO NOT MODIFY
+- */
+-package com.reactlibrary;
+-
+-public final class BuildConfig {
+-  public static final boolean DEBUG = Boolean.parseBoolean("true");
+-  public static final String LIBRARY_PACKAGE_NAME = "com.reactlibrary";
+-  public static final String BUILD_TYPE = "debug";
+-}
+diff --git a/node_modules/@authing/rn/android/build/intermediates/aapt_friendly_merged_manifests/debug/aapt/AndroidManifest.xml b/node_modules/@authing/rn/android/build/intermediates/aapt_friendly_merged_manifests/debug/aapt/AndroidManifest.xml
+deleted file mode 100644
+index 9c04941..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/aapt_friendly_merged_manifests/debug/aapt/AndroidManifest.xml
++++ /dev/null
+@@ -1,15 +0,0 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+-    package="com.reactlibrary" >
+-
+-    <uses-sdk
+-        android:minSdkVersion="16"
+-        android:targetSdkVersion="32" />
+-
+-    <uses-permission android:name="android.permission.INTERNET" />
+-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+-
+-</manifest>
+\ No newline at end of file
+diff --git a/node_modules/@authing/rn/android/build/intermediates/aapt_friendly_merged_manifests/debug/aapt/output-metadata.json b/node_modules/@authing/rn/android/build/intermediates/aapt_friendly_merged_manifests/debug/aapt/output-metadata.json
+deleted file mode 100644
+index 99bfe68..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/aapt_friendly_merged_manifests/debug/aapt/output-metadata.json
++++ /dev/null
+@@ -1,18 +0,0 @@
+-{
+-  "version": 3,
+-  "artifactType": {
+-    "type": "AAPT_FRIENDLY_MERGED_MANIFESTS",
+-    "kind": "Directory"
+-  },
+-  "applicationId": "com.reactlibrary",
+-  "variantName": "debug",
+-  "elements": [
+-    {
+-      "type": "SINGLE",
+-      "filters": [],
+-      "attributes": [],
+-      "outputFile": "AndroidManifest.xml"
+-    }
+-  ],
+-  "elementType": "File"
+-}
+\ No newline at end of file
+diff --git a/node_modules/@authing/rn/android/build/intermediates/aar_metadata/debug/aar-metadata.properties b/node_modules/@authing/rn/android/build/intermediates/aar_metadata/debug/aar-metadata.properties
+deleted file mode 100644
+index 8c9c699..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/aar_metadata/debug/aar-metadata.properties
++++ /dev/null
+@@ -1,4 +0,0 @@
+-aarFormatVersion=1.0
+-aarMetadataVersion=1.0
+-minCompileSdk=1
+-minAndroidGradlePluginVersion=1.0.0
+diff --git a/node_modules/@authing/rn/android/build/intermediates/annotation_processor_list/debug/annotationProcessors.json b/node_modules/@authing/rn/android/build/intermediates/annotation_processor_list/debug/annotationProcessors.json
+deleted file mode 100644
+index 9e26dfe..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/annotation_processor_list/debug/annotationProcessors.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+\ No newline at end of file
+diff --git a/node_modules/@authing/rn/android/build/intermediates/annotation_processor_list/debugAndroidTest/annotationProcessors.json b/node_modules/@authing/rn/android/build/intermediates/annotation_processor_list/debugAndroidTest/annotationProcessors.json
+deleted file mode 100644
+index 9e26dfe..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/annotation_processor_list/debugAndroidTest/annotationProcessors.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+\ No newline at end of file
+diff --git a/node_modules/@authing/rn/android/build/intermediates/compile_r_class_jar/debug/R.jar b/node_modules/@authing/rn/android/build/intermediates/compile_r_class_jar/debug/R.jar
+deleted file mode 100644
+index c63fda1..0000000
+Binary files a/node_modules/@authing/rn/android/build/intermediates/compile_r_class_jar/debug/R.jar and /dev/null differ
+diff --git a/node_modules/@authing/rn/android/build/intermediates/compile_symbol_list/debug/R.txt b/node_modules/@authing/rn/android/build/intermediates/compile_symbol_list/debug/R.txt
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/node_modules/@authing/rn/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties b/node_modules/@authing/rn/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties
+deleted file mode 100644
+index 9122435..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties
++++ /dev/null
+@@ -1 +0,0 @@
+-#Wed Jan 04 14:08:58 CST 2023
+diff --git a/node_modules/@authing/rn/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml b/node_modules/@authing/rn/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml
+deleted file mode 100644
+index 279df61..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml
++++ /dev/null
+@@ -1,2 +0,0 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-<merger version="3"><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/zhongjiahui/github/authing-rn-sdk/android/src/main/res"/><source path="/Users/zhongjiahui/github/authing-rn-sdk/android/build/generated/res/rs/debug"/><source path="/Users/zhongjiahui/github/authing-rn-sdk/android/build/generated/res/resValues/debug"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main" generated-set="main$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/zhongjiahui/github/authing-rn-sdk/android/src/main/res"/><source path="/Users/zhongjiahui/github/authing-rn-sdk/android/build/generated/res/rs/debug"/><source path="/Users/zhongjiahui/github/authing-rn-sdk/android/build/generated/res/resValues/debug"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/zhongjiahui/github/authing-rn-sdk/android/src/debug/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug" generated-set="debug$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/zhongjiahui/github/authing-rn-sdk/android/src/debug/res"/></dataSet><mergedItems/></merger>
+\ No newline at end of file
+diff --git a/node_modules/@authing/rn/android/build/intermediates/incremental/packageDebugResources/compile-file-map.properties b/node_modules/@authing/rn/android/build/intermediates/incremental/packageDebugResources/compile-file-map.properties
+deleted file mode 100644
+index bca8073..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/incremental/packageDebugResources/compile-file-map.properties
++++ /dev/null
+@@ -1 +0,0 @@
+-#Wed Jan 04 12:41:42 CST 2023
+diff --git a/node_modules/@authing/rn/android/build/intermediates/incremental/packageDebugResources/merger.xml b/node_modules/@authing/rn/android/build/intermediates/incremental/packageDebugResources/merger.xml
+deleted file mode 100644
+index 279df61..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/incremental/packageDebugResources/merger.xml
++++ /dev/null
+@@ -1,2 +0,0 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-<merger version="3"><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/zhongjiahui/github/authing-rn-sdk/android/src/main/res"/><source path="/Users/zhongjiahui/github/authing-rn-sdk/android/build/generated/res/rs/debug"/><source path="/Users/zhongjiahui/github/authing-rn-sdk/android/build/generated/res/resValues/debug"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main" generated-set="main$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/zhongjiahui/github/authing-rn-sdk/android/src/main/res"/><source path="/Users/zhongjiahui/github/authing-rn-sdk/android/build/generated/res/rs/debug"/><source path="/Users/zhongjiahui/github/authing-rn-sdk/android/build/generated/res/resValues/debug"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/zhongjiahui/github/authing-rn-sdk/android/src/debug/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug" generated-set="debug$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/zhongjiahui/github/authing-rn-sdk/android/src/debug/res"/></dataSet><mergedItems/></merger>
+\ No newline at end of file
+diff --git a/node_modules/@authing/rn/android/build/intermediates/local_only_symbol_list/debug/R-def.txt b/node_modules/@authing/rn/android/build/intermediates/local_only_symbol_list/debug/R-def.txt
+deleted file mode 100644
+index 78ac5b8..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/local_only_symbol_list/debug/R-def.txt
++++ /dev/null
+@@ -1,2 +0,0 @@
+-R_DEF: Internal format may change without notice
+-local
+diff --git a/node_modules/@authing/rn/android/build/intermediates/manifest_merge_blame_file/debug/manifest-merger-blame-debug-report.txt b/node_modules/@authing/rn/android/build/intermediates/manifest_merge_blame_file/debug/manifest-merger-blame-debug-report.txt
+deleted file mode 100644
+index b35439c..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/manifest_merge_blame_file/debug/manifest-merger-blame-debug-report.txt
++++ /dev/null
+@@ -1,27 +0,0 @@
+-1<?xml version="1.0" encoding="utf-8"?>
+-2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+-3    package="com.reactlibrary" >
+-4
+-5    <uses-sdk
+-6        android:minSdkVersion="16"
+-6-->/Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml
+-7        android:targetSdkVersion="32" />
+-7-->/Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml
+-8
+-9    <uses-permission android:name="android.permission.INTERNET" />
+-9-->/Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:4:5-67
+-9-->/Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:4:22-64
+-10    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+-10-->/Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:5:5-79
+-10-->/Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:5:22-76
+-11    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+-11-->/Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:6:5-76
+-11-->/Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:6:22-73
+-12    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+-12-->/Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:7:5-75
+-12-->/Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:7:22-72
+-13    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+-13-->/Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:8:5-81
+-13-->/Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:8:22-78
+-14
+-15</manifest>
+diff --git a/node_modules/@authing/rn/android/build/intermediates/manifest_merge_blame_file/debugAndroidTest/manifest-merger-blame-debug-androidTest-report.txt b/node_modules/@authing/rn/android/build/intermediates/manifest_merge_blame_file/debugAndroidTest/manifest-merger-blame-debug-androidTest-report.txt
+deleted file mode 100644
+index 7837aa8..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/manifest_merge_blame_file/debugAndroidTest/manifest-merger-blame-debug-androidTest-report.txt
++++ /dev/null
+@@ -1,113 +0,0 @@
+-1<?xml version="1.0" encoding="utf-8"?>
+-2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+-3    package="com.reactlibrary.test" >
+-4
+-5    <uses-sdk
+-5-->/Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest4536758943303422943.xml:5:5-74
+-6        android:minSdkVersion="16"
+-6-->/Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest4536758943303422943.xml:5:15-41
+-7        android:targetSdkVersion="32" />
+-7-->/Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest4536758943303422943.xml:5:42-71
+-8
+-9    <instrumentation
+-9-->/Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest4536758943303422943.xml:11:5-15:71
+-10        android:name="android.test.InstrumentationTestRunner"
+-10-->/Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest4536758943303422943.xml:11:22-75
+-11        android:functionalTest="false"
+-11-->/Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest4536758943303422943.xml:14:22-52
+-12        android:handleProfiling="false"
+-12-->/Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest4536758943303422943.xml:13:22-53
+-13        android:label="Tests for com.reactlibrary.test"
+-13-->/Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest4536758943303422943.xml:15:22-69
+-14        android:targetPackage="com.reactlibrary.test" />
+-14-->/Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest4536758943303422943.xml:12:22-67
+-15
+-16    <uses-permission android:name="android.permission.INTERNET" />
+-16-->[:] /Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/merged_manifest/debug/AndroidManifest.xml:9:5-67
+-16-->[:] /Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/merged_manifest/debug/AndroidManifest.xml:9:22-64
+-17    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+-17-->[:] /Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/merged_manifest/debug/AndroidManifest.xml:10:5-79
+-17-->[:] /Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/merged_manifest/debug/AndroidManifest.xml:10:22-76
+-18    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+-18-->[:] /Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/merged_manifest/debug/AndroidManifest.xml:11:5-76
+-18-->[:] /Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/merged_manifest/debug/AndroidManifest.xml:11:22-73
+-19    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+-19-->[:] /Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/merged_manifest/debug/AndroidManifest.xml:12:5-75
+-19-->[:] /Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/merged_manifest/debug/AndroidManifest.xml:12:22-72
+-20    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+-20-->[:] /Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/merged_manifest/debug/AndroidManifest.xml:13:5-81
+-20-->[:] /Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/merged_manifest/debug/AndroidManifest.xml:13:22-78
+-21
+-22    <supports-screens
+-22-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:11:5-16:39
+-23        android:anyDensity="true"
+-23-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:12:9-34
+-24        android:largeScreens="true"
+-24-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:13:9-36
+-25        android:normalScreens="true"
+-25-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:14:9-37
+-26        android:resizeable="true"
+-26-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:15:9-34
+-27        android:smallScreens="true" />
+-27-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:16:9-36
+-28
+-29    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+-30
+-31    <application android:debuggable="true" >
+-31-->/Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest4536758943303422943.xml:7:5-9:19
+-32        <uses-library android:name="android.test.runner" />
+-32-->/Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest4536758943303422943.xml:8:9-60
+-32-->/Users/zhongjiahui/github/authing-rn-sdk/android/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest4536758943303422943.xml:8:23-57
+-33        <uses-library
+-33-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:25:9-27:40
+-34            android:name="org.apache.http.legacy"
+-34-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:26:13-50
+-35            android:required="false" />
+-35-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:27:13-37
+-36
+-37        <activity
+-37-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:29:9-34:20
+-38            android:name="com.alipay.sdk.app.H5PayActivity"
+-38-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:30:13-60
+-39            android:configChanges="orientation|keyboardHidden|navigation"
+-39-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:31:13-74
+-40            android:exported="false"
+-40-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:32:13-37
+-41            android:screenOrientation="behind" >
+-41-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:33:13-47
+-42        </activity>
+-43        <activity
+-43-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:35:9-40:20
+-44            android:name="com.alipay.sdk.app.H5AuthActivity"
+-44-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:36:13-61
+-45            android:configChanges="orientation|keyboardHidden|navigation"
+-45-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:37:13-74
+-46            android:exported="false"
+-46-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:38:13-37
+-47            android:screenOrientation="behind" >
+-47-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:39:13-47
+-48        </activity>
+-49        <activity
+-49-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:41:9-51:20
+-50            android:name="com.alipay.sdk.app.PayResultActivity"
+-50-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:42:13-64
+-51            android:configChanges="orientation|keyboardHidden|navigation"
+-51-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:43:13-74
+-52            android:exported="true"
+-52-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:44:13-36
+-53            android:launchMode="singleInstance"
+-53-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:45:13-48
+-54            android:screenOrientation="portrait"
+-54-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:46:13-49
+-55            android:theme="@android:style/Theme.Translucent.NoTitleBar" >
+-55-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:47:13-72
+-56            <intent-filter>
+-56-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:48:13-50:29
+-57                <category android:name="android.intent.category.DEFAULT" />
+-57-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:49:17-76
+-57-->[alipaySdk-15.5.9-20181123210601.aar] /Users/zhongjiahui/.gradle/caches/transforms-3/7569aefc278d3a626648d8f625f912f0/transformed/alipaySdk-15.5.9-20181123210601/AndroidManifest.xml:49:27-73
+-58            </intent-filter>
+-59        </activity>
+-60    </application>
+-61
+-62</manifest>
+diff --git a/node_modules/@authing/rn/android/build/intermediates/merged_manifest/debug/AndroidManifest.xml b/node_modules/@authing/rn/android/build/intermediates/merged_manifest/debug/AndroidManifest.xml
+deleted file mode 100644
+index 9c04941..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/merged_manifest/debug/AndroidManifest.xml
++++ /dev/null
+@@ -1,15 +0,0 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+-    package="com.reactlibrary" >
+-
+-    <uses-sdk
+-        android:minSdkVersion="16"
+-        android:targetSdkVersion="32" />
+-
+-    <uses-permission android:name="android.permission.INTERNET" />
+-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+-
+-</manifest>
+\ No newline at end of file
+diff --git a/node_modules/@authing/rn/android/build/intermediates/navigation_json/debug/navigation.json b/node_modules/@authing/rn/android/build/intermediates/navigation_json/debug/navigation.json
+deleted file mode 100644
+index 0637a08..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/navigation_json/debug/navigation.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+\ No newline at end of file
+diff --git a/node_modules/@authing/rn/android/build/intermediates/packaged_manifests/debug/output-metadata.json b/node_modules/@authing/rn/android/build/intermediates/packaged_manifests/debug/output-metadata.json
+deleted file mode 100644
+index 573b536..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/packaged_manifests/debug/output-metadata.json
++++ /dev/null
+@@ -1,18 +0,0 @@
+-{
+-  "version": 3,
+-  "artifactType": {
+-    "type": "PACKAGED_MANIFESTS",
+-    "kind": "Directory"
+-  },
+-  "applicationId": "com.reactlibrary",
+-  "variantName": "debug",
+-  "elements": [
+-    {
+-      "type": "SINGLE",
+-      "filters": [],
+-      "attributes": [],
+-      "outputFile": "../../merged_manifest/debug/AndroidManifest.xml"
+-    }
+-  ],
+-  "elementType": "File"
+-}
+\ No newline at end of file
+diff --git a/node_modules/@authing/rn/android/build/intermediates/packaged_manifests/debugAndroidTest/AndroidManifest.xml b/node_modules/@authing/rn/android/build/intermediates/packaged_manifests/debugAndroidTest/AndroidManifest.xml
+deleted file mode 100644
+index 2461a13..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/packaged_manifests/debugAndroidTest/AndroidManifest.xml
++++ /dev/null
+@@ -1,62 +0,0 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+-    package="com.reactlibrary.test" >
+-
+-    <uses-sdk
+-        android:minSdkVersion="16"
+-        android:targetSdkVersion="32" />
+-
+-    <instrumentation
+-        android:name="android.test.InstrumentationTestRunner"
+-        android:functionalTest="false"
+-        android:handleProfiling="false"
+-        android:label="Tests for com.reactlibrary.test"
+-        android:targetPackage="com.reactlibrary.test" />
+-
+-    <uses-permission android:name="android.permission.INTERNET" />
+-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+-
+-    <supports-screens
+-        android:anyDensity="true"
+-        android:largeScreens="true"
+-        android:normalScreens="true"
+-        android:resizeable="true"
+-        android:smallScreens="true" />
+-
+-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+-
+-    <application android:debuggable="true" >
+-        <uses-library android:name="android.test.runner" />
+-        <uses-library
+-            android:name="org.apache.http.legacy"
+-            android:required="false" />
+-
+-        <activity
+-            android:name="com.alipay.sdk.app.H5PayActivity"
+-            android:configChanges="orientation|keyboardHidden|navigation"
+-            android:exported="false"
+-            android:screenOrientation="behind" >
+-        </activity>
+-        <activity
+-            android:name="com.alipay.sdk.app.H5AuthActivity"
+-            android:configChanges="orientation|keyboardHidden|navigation"
+-            android:exported="false"
+-            android:screenOrientation="behind" >
+-        </activity>
+-        <activity
+-            android:name="com.alipay.sdk.app.PayResultActivity"
+-            android:configChanges="orientation|keyboardHidden|navigation"
+-            android:exported="true"
+-            android:launchMode="singleInstance"
+-            android:screenOrientation="portrait"
+-            android:theme="@android:style/Theme.Translucent.NoTitleBar" >
+-            <intent-filter>
+-                <category android:name="android.intent.category.DEFAULT" />
+-            </intent-filter>
+-        </activity>
+-    </application>
+-
+-</manifest>
+\ No newline at end of file
+diff --git a/node_modules/@authing/rn/android/build/intermediates/packaged_manifests/debugAndroidTest/output-metadata.json b/node_modules/@authing/rn/android/build/intermediates/packaged_manifests/debugAndroidTest/output-metadata.json
+deleted file mode 100644
+index dfefadb..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/packaged_manifests/debugAndroidTest/output-metadata.json
++++ /dev/null
+@@ -1,18 +0,0 @@
+-{
+-  "version": 3,
+-  "artifactType": {
+-    "type": "PACKAGED_MANIFESTS",
+-    "kind": "Directory"
+-  },
+-  "applicationId": "com.reactlibrary.test",
+-  "variantName": "debugAndroidTest",
+-  "elements": [
+-    {
+-      "type": "SINGLE",
+-      "filters": [],
+-      "attributes": [],
+-      "outputFile": "AndroidManifest.xml"
+-    }
+-  ],
+-  "elementType": "File"
+-}
+\ No newline at end of file
+diff --git a/node_modules/@authing/rn/android/build/intermediates/symbol_list_with_package_name/debug/package-aware-r.txt b/node_modules/@authing/rn/android/build/intermediates/symbol_list_with_package_name/debug/package-aware-r.txt
+deleted file mode 100644
+index 4a700b6..0000000
+--- a/node_modules/@authing/rn/android/build/intermediates/symbol_list_with_package_name/debug/package-aware-r.txt
++++ /dev/null
+@@ -1 +0,0 @@
+-com.reactlibrary
+diff --git a/node_modules/@authing/rn/android/build/outputs/logs/manifest-merger-debug-report.txt b/node_modules/@authing/rn/android/build/outputs/logs/manifest-merger-debug-report.txt
+deleted file mode 100644
+index 11ba7a6..0000000
+--- a/node_modules/@authing/rn/android/build/outputs/logs/manifest-merger-debug-report.txt
++++ /dev/null
+@@ -1,45 +0,0 @@
+--- Merging decision tree log ---
+-manifest
+-ADDED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:2:1-9:12
+-INJECTED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:2:1-9:12
+-INJECTED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:2:1-9:12
+-	package
+-		ADDED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:3:11-37
+-		INJECTED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml
+-		INJECTED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml
+-	xmlns:android
+-		ADDED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:2:11-69
+-uses-permission#android.permission.INTERNET
+-ADDED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:4:5-67
+-	android:name
+-		ADDED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:4:22-64
+-uses-permission#android.permission.ACCESS_NETWORK_STATE
+-ADDED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:5:5-79
+-	android:name
+-		ADDED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:5:22-76
+-uses-permission#android.permission.ACCESS_WIFI_STATE
+-ADDED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:6:5-76
+-	android:name
+-		ADDED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:6:22-73
+-uses-permission#android.permission.READ_PHONE_STATE
+-ADDED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:7:5-75
+-	android:name
+-		ADDED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:7:22-72
+-uses-permission#android.permission.WRITE_EXTERNAL_STORAGE
+-ADDED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:8:5-81
+-	android:name
+-		ADDED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml:8:22-78
+-uses-sdk
+-INJECTED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml reason: use-sdk injection requested
+-INJECTED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml
+-INJECTED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml
+-INJECTED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml
+-INJECTED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml
+-	android:targetSdkVersion
+-		INJECTED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml
+-		ADDED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml
+-		INJECTED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml
+-	android:minSdkVersion
+-		INJECTED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml
+-		ADDED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml
+-		INJECTED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml
