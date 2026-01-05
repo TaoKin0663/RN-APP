@@ -108,3 +108,24 @@ export type AuthingUserInfoType = {
   photo: string | null,
   phone: string | null
 };
+
+export interface ISafeInfo {
+  // Safe 账户地址
+  address: string;
+  // 当前 nonce 值
+  nonce: string;
+  // 确认阈值（需要多少个拥有者签名）
+  threshold: number;
+  // 拥有者地址列表
+  owners: string[];
+  // 模块列表
+  modules: string[];
+  // 回退处理器地址
+  fallbackHandler: string;
+  // 守护者地址（0x0 表示无守护者）
+  guard: string;
+  // Safe 版本
+  version: string;
+  // Singleton 合约地址
+  singleton: string;
+}

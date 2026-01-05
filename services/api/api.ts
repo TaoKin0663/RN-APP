@@ -1,5 +1,5 @@
 import { defaultApi, type RequestOptions } from '@/services/api/http';
-import type { ApiResponse, IToken, KycTokenQuery, KycTokenResponse, AuthingUserInfoType } from '@/services/api/types';
+import type { ApiResponse, IToken, KycTokenQuery, KycTokenResponse, AuthingUserInfoType, ISafeInfo } from '@/services/api/types';
 
 /**
  * 业务层统一入口：api.xxx()
@@ -9,6 +9,22 @@ export const api = {
     user:{
         getUserInfo: ()=>{
             return defaultApi.get<ApiResponse<AuthingUserInfoType>>('/api/user/getProfile');
+        }
+    },
+    safe:{
+        // /api/safe/getsafesbyownerAddress?chainId=11155111&ownerAddress=0xb1F844b25E735067812205C339f2610dd0b662Dc
+        getSafesByOwnerAddress: (chainId: number, ownerAddress: string) => {
+            return defaultApi.get<ApiResponse<{
+                safes: string[];
+            }>>(
+                `/api/safe/getsafesbyownerAddress?chainId=${chainId}&ownerAddress=${ownerAddress}`,
+            );
+        },
+        // /api/safe/getSafeInfo?chainId=11155111&safeAddress=0x89BB46F2623c9c06CF4Dd06a6E1E54209920A88D
+        getSafeInfo: (chainId: number, safeAddress: string) => {
+            return defaultApi.get<ApiResponse<ISafeInfo>>(
+                `/api/safe/getSafeInfo?chainId=${chainId}&safeAddress=${safeAddress}`,
+            );
         }
     },
     token: {

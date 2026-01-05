@@ -427,6 +427,7 @@ export default function NewSafe() {
       // 3. 逐链部署（仅在需要时切换网络并发送交易）
       const originalChainId = chainId;
       let currentChainId = chainId;
+      let firstTxHash: `0x${string}` | null = null;
 
       for (const c of selectedChains) {
         const provider = c.rpcUrls.default.http?.[0];
@@ -462,9 +463,15 @@ export default function NewSafe() {
 
           setStep(c.id, { txHash: txHash as `0x${string}`, status: 'confirming' });
 
-          // 等待交易确认（简化版，实际应该监听交易状态）
-          // 这里我们假设交易已发送，状态会在后续更新
-          setStep(c.id, { status: 'success' });
+          // 保存第一条链的交易哈希，用于跳转到交易进度页面
+          if (!firstTxHash) {
+            firstTxHash = txHash as `0x${string}`;
+            // 跳转到交易进度页面，监听第一条链的交易状态
+            router.push({
+              pathname: '/transaction-progress',
+              params: { hash: firstTxHash },
+            });
+          }
         } catch (e) {
           const msg = (e as Error)?.message || '未知错误';
           setStep(c.id, { status: 'failed', error: msg });
@@ -480,18 +487,8 @@ export default function NewSafe() {
         // ignore
       }
 
-      // 检查是否所有链都部署完成
-      const allOk = steps.every((s) => s.status === 'success' || s.status === 'skipped');
-      if (allOk) {
-        Alert.alert('成功', 'Safe 智能账户创建成功！', [
-          {
-            text: '确定',
-            onPress: () => {
-              router.push('/(tabs)');
-            },
-          },
-        ]);
-      }
+      // 注意：交易状态监听已转移到 transaction-progress 页面
+      // 这里不再需要检查所有链的状态，因为用户已经在交易进度页面
     } catch (error) {
       Alert.alert('错误', '创建 Safe 智能账户失败: ' + (error as Error).message);
     } finally {
