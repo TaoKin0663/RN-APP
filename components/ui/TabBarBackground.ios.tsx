@@ -14,6 +14,11 @@ export default function BlurTabBarBackground() {
   );
 }
 
+// Tab bar height: 72px + bottom margin: 20px = 92px
+const TAB_BAR_HEIGHT = 92;
+
 export function useBottomTabOverflow() {
-  return useBottomTabBarHeight();
+  // Since we're using a custom absolutely positioned tab bar,
+  // we need to use a fixed value instead of useBottomTabBarHeight()
+  return TAB_BAR_HEIGHT;
 }

@@ -10,9 +10,9 @@ export const reownWhite = '#E9E9E9';
 
 export const Colors = {
   light: {
-    primary: '#6e52e3',//主色
+    primary: '#FFB500',//主色
     secondary: '#7C3AED',//次色
-    accent: '#0C4A6E',//强调色
+    accent: '#FFB500',//强调色
     success: '#047857',//成功色
     warning: '#B45309',//警告色
     error: '#B91C1C',//错误色
@@ -25,12 +25,12 @@ export const Colors = {
     border: '#CBD5E1',//边框色
     borderLight: '#E2E8F0',//边框浅色
     icon: '#475569',//图标色
-    buttonPrimary: '#0369A1',
-    buttonSecondary: '#7C3AED',
-    buttonAccent: '#0C4A6E',
+    buttonPrimary: '#FFB500',
+    buttonSecondary: '#F8FAFC',
+    buttonAccent: '#FFB500',
     gradientStart: '#0369A1',
     gradientEnd: '#7C3AED',
-    gradientAccent: '#0C4A6E',
+    gradientAccent: '#FFB500',
     shadow: 'rgba(0, 0, 0, 0.1)',
     shadowDark: 'rgba(0, 0, 0, 0.25)',
     // 向后兼容字段
@@ -43,9 +43,9 @@ export const Colors = {
     gray: reownGray,//灰色
   },
   dark: {
-    primary: '#FFBD00',//主色 - 黄色
+    primary: '#FFB500',//主色 - 黄色
     secondary: '#FFC107',//次色 - 金黄
-    accent: '#FFBD00',//强调色 - 黄色
+    accent: '#FFB500',//强调色 - 黄色
     success: '#4CAF50',//成功色
     warning: '#FF9800',//警告色
     error: '#F44336',//错误色
@@ -58,12 +58,12 @@ export const Colors = {
     border: '#333333',//边框色 - 深灰
     borderLight: '#404040',// 边框浅色
     icon: '#B0B0B0',//图标色 - 中灰
-    buttonPrimary: '#FFBD00',
+    buttonPrimary: '#FFB500',
     buttonSecondary: '#FFC107',
-    buttonAccent: '#FFBD00',
-    gradientStart: '#FFBD00',
+    buttonAccent: '#FFB500',
+    gradientStart: '#FFB500',
     gradientEnd: '#FFC107',
-    gradientAccent: '#FFBD00',
+    gradientAccent: '#FFB500',
     shadow: 'rgba(0, 0, 0, 0.5)',
     shadowDark: 'rgba(0, 0, 0, 0.8)',
     // 向后兼容字段

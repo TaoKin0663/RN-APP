@@ -1,6 +1,3 @@
-const workletsPluginOptions = {
-  // Your custom options.
-}
 module.exports = function (api) {
   api.cache(true);
   return {
@@ -9,7 +6,6 @@ module.exports = function (api) {
       "nativewind/babel",
     ],
     plugins: [
-      ['react-native-worklets/plugin', workletsPluginOptions],
       'react-native-reanimated/plugin', // 必须在最后
     ],
   };

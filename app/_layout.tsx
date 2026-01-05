@@ -11,7 +11,7 @@ import { WagmiAdapter } from "@reown/appkit-wagmi-react-native";
 import { SolanaAdapter, PhantomConnector, SolflareConnector } from "@reown/appkit-solana-react-native";
 import { BitcoinAdapter } from "@reown/appkit-bitcoin-react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { arbitrum, mainnet, polygon } from "@wagmi/core/chains";
+import { arbitrum, mainnet, polygon, sepolia, base, optimism, bsc } from "@wagmi/core/chains";
 import { WagmiProvider } from "wagmi";
 
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
@@ -54,7 +54,7 @@ const metadata = {
   },
 };
 
-const networks = [mainnet, polygon, arbitrum];
+const networks = [mainnet, polygon, arbitrum, base, optimism, bsc, sepolia];
 
 const wagmiAdapter = new WagmiAdapter({
   projectId,
@@ -73,8 +73,11 @@ const appkit = createAppKit({
   metadata,
   clipboardClient,
   storage,
-  defaultNetwork: mainnet, // Optional
+  defaultNetwork: sepolia, // Optional
   enableAnalytics: true, // Optional - defaults to your Cloud configuration
+  features: {
+    socials: false,
+  },
 });
 
 function RootLayoutContent() {

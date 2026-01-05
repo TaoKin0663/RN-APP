@@ -9,7 +9,7 @@ import type { IToken } from '@/services/api/types';
 import { TokenIcon } from '@/components/TokenIcon';
 import { useRouter } from 'expo-router';
 import { NetworkSelector, type Network } from '@/components/NetworkSelector';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type TabType = 'regular' | 'stake' | 'equity';
 
@@ -107,7 +107,6 @@ function TokenItem({ token }: { token: IToken }) {
 export default function TabTwoScreen() {
   const { colorScheme } = useTheme();
   const colors = Colors[colorScheme ?? 'dark'];
-  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabType>('regular');
   const [tokens, setTokens] = useState<IToken[]>([]);
   const [loading, setLoading] = useState(true);
@@ -196,14 +195,13 @@ export default function TabTwoScreen() {
   };
 
   return (
-    <View className="flex-1" style={{ backgroundColor: colors.background }}>
+    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       {/* 顶部导航栏 */}
       <View 
-        className="flex-row items-center justify-between px-4 pb-3"
+        className="flex-row items-center justify-between px-4 pb-3 pt-3"
         style={{ 
-          backgroundColor: colors.background,
-          paddingTop: insets.top + 12
+          backgroundColor: colors.background
         }}
       >
         <Text className="text-lg font-semibold" style={{ color: colors.text }}>交易</Text>
@@ -333,6 +331,6 @@ export default function TabTwoScreen() {
         )}
       </ScrollView>
 
-    </View>
+    </SafeAreaView>
   );
 }

@@ -7,7 +7,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ThemedText';
-import { BouncyButton } from '@/components/BouncyButton';
+import { Button } from '@/components/Button';
 import { useUserStore } from '@/store';
 import { useTheme } from '@/hooks/use-theme';
 import { Colors } from '@/config/theme';
@@ -69,7 +69,7 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView 
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 92 }]}
         showsVerticalScrollIndicator={false}
       >
 
@@ -82,13 +82,13 @@ export default function ProfileScreen() {
             <ThemedText type="default" style={styles.loginPrompt}>
               请先登录以查看个人信息
             </ThemedText>
-            <BouncyButton
+            <Button
               style={[styles.loginButton, { backgroundColor: colors.tint }]}
               textStyle={styles.loginButtonText}
               onPress={handleLoginPress}
             >
               立即登录
-            </BouncyButton>
+            </Button>
           </View>
         ) : (
           // 已登录状态：显示用户信息
@@ -145,13 +145,13 @@ export default function ProfileScreen() {
               )}
             </View>
 
-            <BouncyButton
+            <Button
               style={[styles.logoutButton, { backgroundColor: '#ff4444' }]}
               textStyle={styles.logoutButtonText}
               onPress={handleLogout}
             >
               登出
-            </BouncyButton>
+            </Button>
           </View>
         )}
       </ScrollView>
@@ -162,7 +162,6 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 40,
     paddingTop: 16,
   },
   loginContainer: {
