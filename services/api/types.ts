@@ -153,3 +153,11 @@ export interface ISafeInfo {
   // Singleton 合约地址
   singleton: string;
 }
+
+export type KYCStatusResponse = {
+  isVerified: boolean;
+  type?: number;
+  sub_kyc_status?: string;
+  onchain_kyc_status?: string;
+  walletaddress: string;
+};

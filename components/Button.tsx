@@ -22,6 +22,8 @@ type ButtonColor =
   | 'warning' 
   | 'error';
 
+type ButtonVariant = 'solid' | 'outline';
+
 interface ButtonProps extends Omit<TouchableOpacityProps, 'style' | 'className'> {
   children: React.ReactNode;
   style?: ViewStyle | ViewStyle[];
@@ -29,6 +31,7 @@ interface ButtonProps extends Omit<TouchableOpacityProps, 'style' | 'className'>
   className?: string;
   enableHaptic?: boolean;
   color?: ButtonColor;
+  variant?: ButtonVariant;
   springConfig?: {
     damping?: number;
     stiffness?: number;
@@ -44,6 +47,7 @@ export function Button({
   enableHaptic = true,
   springConfig,
   color,
+  variant = 'solid',
   onPress,
   ...props
 }: ButtonProps) {
@@ -69,7 +73,13 @@ export function Button({
     return buttonColorMap[color];
   };
   
-  const backgroundColor = useThemeColor({}, getColorKey());
+  const buttonColor = useThemeColor({}, getColorKey());
+  const textColor = useThemeColor({}, 'text');
+  const borderColor = useThemeColor({}, 'border');
+  
+  // 根据 variant 决定背景色和文字颜色
+  const backgroundColor = variant === 'outline' ? 'transparent' : buttonColor;
+  const finalTextColor = variant === 'outline' ? textColor : '#FFFFFF';
 
   // 风格的弹簧配置：更柔和的弹跳效果
   const defaultSpringConfig = {
@@ -151,7 +161,7 @@ export function Button({
 
   // 默认文字样式
   const defaultTextStyle: TextStyle = {
-    color: '#FFFFFF', // 白色文字，确保在按钮背景上清晰可见
+    color: finalTextColor,
     fontSize: 16,
     fontWeight: '500',
   };
@@ -206,6 +216,10 @@ export function Button({
     alignSelf: 'flex-start', // 宽度由内容撑开
     minHeight, // 适中的高度
     minWidth, // 适中的宽度
+    ...(variant === 'outline' && {
+      borderWidth: 1.5,
+      borderColor: borderColor,
+    }),
   };
 
   return (

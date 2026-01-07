@@ -1,17 +1,17 @@
 import { defaultApi, type RequestOptions } from '@/services/api/http';
-import type { ApiResponse, IToken, KycTokenQuery, KycTokenResponse, AuthingUserInfoType, ISafeInfo } from '@/services/api/types';
+import type { ApiResponse, IToken, KycTokenQuery, KycTokenResponse, AuthingUserInfoType, ISafeInfo, KYCStatusResponse } from '@/services/api/types';
 
 /**
  * 业务层统一入口：api.xxx()
  * - types 集中在 services/api/types.ts
  */
 export const api = {
-    user:{
-        getUserInfo: ()=>{
+    user: {
+        getUserInfo: () => {
             return defaultApi.get<ApiResponse<AuthingUserInfoType>>('/api/user/getProfile');
         }
     },
-    safe:{
+    safe: {
         // /api/safe/getsafesbyownerAddress?chainId=11155111&ownerAddress=0xb1F844b25E735067812205C339f2610dd0b662Dc
         getSafesByOwnerAddress: (chainId: number, ownerAddress: string) => {
             return defaultApi.get<ApiResponse<{
@@ -49,6 +49,12 @@ export const api = {
                 query,
                 options,
             ),
+        getKycStatus: (params: { tokenAddress: string; userAddressToCheck: string }) => {
+            return defaultApi.get<ApiResponse<KYCStatusResponse>>(
+                '/api/kyc/status',
+                params,
+            );
+        }
     },
 } as const;
 

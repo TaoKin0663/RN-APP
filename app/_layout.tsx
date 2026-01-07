@@ -26,6 +26,10 @@ import { ThemeProvider, useTheme } from '@/hooks/use-theme';
 import { storage } from "@/utils/StorageUtil";
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { ModalProvider } from "@/components/ui/Modal";
+import { setApiTokenProvider } from '@/services/api/http';
+import { useUserStore } from '@/store';
+import { useEffect } from 'react';
 import '../global.css';
 
 const clipboardClient = {
@@ -89,6 +93,16 @@ function RootLayoutContent() {
     KHTekaMono: require('../assets/fonts/KHTekaMono-Regular.otf'),
   });
 
+  // 设置 token provider，让 http 模块可以从 store 获取 token
+  useEffect(() => {
+    setApiTokenProvider(() => {
+      // 每次都从 store 获取最新的 token
+      return useUserStore.getState().token || undefined;
+    });
+  }, []);
+
+  // 当 token 变化时，tokenProvider 会自动获取最新值（因为它是从 store 读取的）
+
   if (!loaded) {
     // Async font loading only occurs in development.
     return null;
@@ -101,15 +115,17 @@ function RootLayoutContent() {
           <QueryClientProvider client={queryClient}>
             <AppKitProvider instance={appkit}>
               <BottomSheetModalProvider>
-                <Stack>
-                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                  <Stack.Screen name="+not-found" />
-                </Stack>
-                <StatusBar style="auto" />
-                {/* This is a workaround for the Android modal issue. https://github.com/expo/expo/issues/32991#issuecomment-2489620459 */}
-                <View style={{ position: "absolute", height: "100%", width: "100%" }}>
-                  <AppKit />
-                </View>
+                <ModalProvider>
+                  <Stack>
+                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                    <Stack.Screen name="+not-found" />
+                  </Stack>
+                  <StatusBar style="auto" />
+                  {/* This is a workaround for the Android modal issue. https://github.com/expo/expo/issues/32991#issuecomment-2489620459 */}
+                  <View style={{ position: "absolute", height: "100%", width: "100%" }}>
+                    <AppKit />
+                  </View>
+                </ModalProvider>
               </BottomSheetModalProvider>
             </AppKitProvider>
           </QueryClientProvider>

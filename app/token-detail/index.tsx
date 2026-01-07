@@ -1,11 +1,11 @@
-import { TouchableOpacity, View, Text, ScrollView, ActivityIndicator, TextInput, Platform, Keyboard } from 'react-native';
+import { TouchableOpacity, View, Text, ScrollView, ActivityIndicator, TextInput, Platform, Keyboard, Alert } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/config/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { useState, useEffect, useRef, useCallback,useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { api } from '@/services/api/api';
-import type { IToken } from '@/services/api/types';
+import type { IToken, KYCStatusResponse } from '@/services/api/types';
 import { TokenIcon } from '@/components/TokenIcon';
 import { Button } from '@/components/Button';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
@@ -13,6 +13,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatUnits } from 'viem';
 import * as Clipboard from 'expo-clipboard';
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop, BottomSheetBackdropProps } from "@gorhom/bottom-sheet";
+import { useModal } from '@/components/ui/Modal';
+import { ModalContent } from '@/components/ui/ModalContent';
+import { useAppStore } from '@/store';
 
 enum TokenType {
     REGULAR_BENEFITS = "REGULAR_BENEFITS",
@@ -25,12 +28,15 @@ export default function TokenDetailScreen() {
     const colors = Colors[colorScheme ?? 'dark'];
     const router = useRouter();
     const { tokenAddress } = useLocalSearchParams<{ tokenAddress: string }>();
+    const selectedAccountAddress = useAppStore(state => state.selectedAccountAddress);
     const [token, setToken] = useState<IToken | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [investmentAmount, setInvestmentAmount] = useState('');
     const [keyboardHeight, setKeyboardHeight] = useState(0);
     const bottomSheetRef = useRef<BottomSheet>(null);
+    const [showUnsupportedModal, setShowUnsupportedModal] = useState(false);
+    const { show, hide } = useModal();
     // const snapPoints = useMemo(() => ["25%", "50%", "75%"], []);
 
     // 格式化地址显示
@@ -113,6 +119,60 @@ export default function TokenDetailScreen() {
         }
     };
 
+    const check = async () => {
+        if(!token) {
+            return;
+        }
+        if (!selectedAccountAddress) {
+            console.error('未选择账户地址');
+            return;
+        }
+        const KYCStatusResponse = await api.kyc.getKycStatus({ tokenAddress, userAddressToCheck: selectedAccountAddress });
+        if (!KYCStatusResponse.success) {
+            return;
+        }
+        if (!KYCStatusResponse.data.isVerified) {
+            show(
+                <ModalContent
+                    title="提示"
+                    message={`当前地址不能购买${token?.symbol}，当前账号未通过KYC`}
+                    buttons={[
+                        <Button variant="outline" onPress={hide}>
+                            取消
+                        </Button>,
+                        <Button color="primary" onPress={() => {
+                            hide();
+                            router.push({
+                                pathname: '/kyc' as any,
+                                params: {
+                                    tokenAddress: tokenAddress,
+                                    factoryAddress:token.factory_address,
+                                },
+                            })
+                        }}>
+                            去认证
+                        </Button>
+                    ]}
+                />
+            );
+            return;
+        }
+        if (KYCStatusResponse.data.walletaddress != selectedAccountAddress) {
+            show(
+                <ModalContent
+                    title="提示"
+                    message={`当前地址不能购买${token?.symbol}，当前账号绑定地址：${formatAddress(KYCStatusResponse.data.walletaddress)}`}
+                    buttons={
+                        <Button color="primary" onPress={hide}>
+                            我知道了
+                        </Button>
+                    }
+                />
+            );
+            return;
+        }
+    }
+
     // 获取代币详情
     useEffect(() => {
         const fetchTokenDetail = async () => {
@@ -165,15 +225,15 @@ export default function TokenDetailScreen() {
 
 
     const renderBackdrop = useCallback(
-		(props: BottomSheetBackdropProps) => (
-			<BottomSheetBackdrop
-				{...props}
-				disappearsOnIndex={-1}
-				appearsOnIndex={0}
-			/>
-		),
-		[]
-	);
+        (props: BottomSheetBackdropProps) => (
+            <BottomSheetBackdrop
+                {...props}
+                disappearsOnIndex={-1}
+                appearsOnIndex={0}
+            />
+        ),
+        []
+    );
 
     // 信息卡片组件
     const InfoCard = ({ label, value, onPress, copyable = false }: {
@@ -497,12 +557,9 @@ export default function TokenDetailScreen() {
                                 alignSelf: 'stretch',
                             }}
                             onPress={() => {
-                                // 先关闭键盘，避免遮挡bottomSheet
                                 Keyboard.dismiss();
                                 // 延迟一帧再打开bottomSheet，确保键盘完全关闭
-                                setTimeout(() => {
-                                    bottomSheetRef.current?.expand();
-                                }, 100);
+                                check();
                             }}
                         >
                             投资
@@ -524,7 +581,7 @@ export default function TokenDetailScreen() {
                     <Text className="text-xl font-bold mb-6" style={{ color: colors.text }}>
                         购买预览
                     </Text>
-                    
+
                     <View className="mb-4">
                         <View className="flex-row justify-between items-center mb-3">
                             <Text className="text-base" style={{ color: colors.textSecondary }}>
@@ -534,7 +591,7 @@ export default function TokenDetailScreen() {
                                 100 RWA
                             </Text>
                         </View>
-                        
+
                         <View className="flex-row justify-between items-center mb-3">
                             <Text className="text-base" style={{ color: colors.textSecondary }}>
                                 单价
@@ -543,7 +600,7 @@ export default function TokenDetailScreen() {
                                 $1.23
                             </Text>
                         </View>
-                        
+
                         <View className="flex-row justify-between items-center mb-3">
                             <Text className="text-base" style={{ color: colors.textSecondary }}>
                                 手续费
@@ -552,12 +609,12 @@ export default function TokenDetailScreen() {
                                 $1.20
                             </Text>
                         </View>
-                        
-                        <View 
+
+                        <View
                             className="h-px my-4"
                             style={{ backgroundColor: colors.backgroundSecondary }}
                         />
-                        
+
                         <View className="flex-row justify-between items-center">
                             <Text className="text-lg font-semibold" style={{ color: colors.text }}>
                                 合计
@@ -567,7 +624,7 @@ export default function TokenDetailScreen() {
                             </Text>
                         </View>
                     </View>
-                    
+
                     <Button
                         className="w-full mt-4"
                         color="primary"

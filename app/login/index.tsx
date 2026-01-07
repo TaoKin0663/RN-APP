@@ -3,7 +3,7 @@ import { StatusBar, View, Text, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { useUserStore } from '@/store';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 
 // 动态导入 AuthingGuard，避免在 Expo Go 中直接加载
 let AuthingGuard: any = null;
@@ -91,8 +91,17 @@ export default function Login() {
     if (!isReady || !AuthingGuard) {
         return (
             <>
-                <StatusBar barStyle="dark-content" />
-                <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                {/* <StatusBar barStyle="dark-content" /> */}
+                <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} edges={['bottom', 'left', 'right']}>
+                    <Stack.Screen options={{
+                        title: '登录',
+                        headerTitleAlign: 'center',
+                        headerShadowVisible: false,
+                        // headerStyle: {
+                        //     backgroundColor: '#000',
+                        // },
+                        // headerTintColor: '#fff',
+                    }} />
                     <View style={{ padding: 20 }}>
                         <Text style={{ fontSize: 16, textAlign: 'center', marginBottom: 10 }}>
                             Authing SDK 需要开发构建
@@ -111,8 +120,16 @@ export default function Login() {
 
     return (
         <>
-            <StatusBar barStyle="dark-content" />
-            <SafeAreaView style={{ flex: 1 }}>
+            <SafeAreaView style={{ flex: 1 }} edges={['bottom', 'left', 'right']}>
+                <Stack.Screen options={{
+                    title: '登录',
+                    headerTitleAlign: 'center',
+                    headerShadowVisible: false,
+                    // headerStyle: {
+                    //     backgroundColor: '#000',
+                    // },
+                    // headerTintColor: '#fff',
+                }} />
                 <AuthingGuard appId={appId} options={options} onLogin={onLogin} />
             </SafeAreaView>
         </>
