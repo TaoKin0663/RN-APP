@@ -16,6 +16,7 @@ import BottomSheet, { BottomSheetView, BottomSheetBackdrop, BottomSheetBackdropP
 import { useModal } from '@/components/ui/Modal';
 import { ModalContent } from '@/components/ui/ModalContent';
 import { useAppStore } from '@/store';
+import { startKYCVerificationWithAlert } from '@/utils/kycVerification';
 
 enum TokenType {
     REGULAR_BENEFITS = "REGULAR_BENEFITS",
@@ -35,7 +36,6 @@ export default function TokenDetailScreen() {
     const [investmentAmount, setInvestmentAmount] = useState('');
     const [keyboardHeight, setKeyboardHeight] = useState(0);
     const bottomSheetRef = useRef<BottomSheet>(null);
-    const [showUnsupportedModal, setShowUnsupportedModal] = useState(false);
     const { show, hide } = useModal();
     // const snapPoints = useMemo(() => ["25%", "50%", "75%"], []);
 
@@ -140,15 +140,30 @@ export default function TokenDetailScreen() {
                         <Button variant="outline" onPress={hide}>
                             取消
                         </Button>,
-                        <Button color="primary" onPress={() => {
+                        <Button color="primary" onPress={async () => {
                             hide();
-                            router.push({
-                                pathname: '/kyc' as any,
-                                params: {
+                            // 检查必要参数
+                            if (!selectedAccountAddress || !tokenAddress || !token.factory_address) {
+                                Alert.alert('错误', '缺少必要参数');
+                                return;
+                            }
+                            // 直接调用 KYC 验证方法
+                            await startKYCVerificationWithAlert(
+                                {
+                                    walletAddress: selectedAccountAddress,
                                     tokenAddress: tokenAddress,
-                                    factoryAddress:token.factory_address,
+                                    factoryAddress: token.factory_address,
+                                    chainId: '11155111',
                                 },
-                            })
+                                () => {
+                                    // 验证成功回调，可以刷新状态
+                                    console.log('KYC 验证成功');
+                                },
+                                (error) => {
+                                    // 验证失败回调
+                                    console.log('KYC 验证失败:', error);
+                                }
+                            );
                         }}>
                             去认证
                         </Button>

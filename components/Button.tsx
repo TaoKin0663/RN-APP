@@ -137,8 +137,14 @@ export function Button({
     }
   };
 
-  const handlePressOut = () => {
+  const handlePressOut = (event: any) => {
     if (props.disabled) return;
+    
+    // 松手时立即触发 onPress 回调，不等待 React Native 的 onPress 事件
+    // 这样可以减少延迟感，让响应更快
+    if (onPress && !props.disabled) {
+      onPress(event);
+    }
     
     // 松手时自然回弹效果：增加阻尼，减少弹跳，让动画更平滑
     scale.value = withSpring(1, {
@@ -151,12 +157,6 @@ export function Button({
       damping: 20,
       stiffness: 300,
     });
-  };
-
-  const handlePress = (event: any) => {
-    if (onPress && !props.disabled) {
-      onPress(event);
-    }
   };
 
   // 默认文字样式
@@ -229,7 +229,6 @@ export function Button({
       style={[defaultStyle, style, animatedStyle]}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      onPress={handlePress}
       activeOpacity={1}
     >
       {renderContent()}

@@ -1,100 +1,73 @@
-import React, { useEffect, useState } from 'react';
-import { Pressable, StyleProp, StyleSheet, View, ViewStyle, BackHandler } from 'react-native';
-import Animated, {
-    useSharedValue,
-    useAnimatedStyle,
-    withTiming,
-    runOnJS,
-    Easing,
-    interpolate,
-} from 'react-native-reanimated';
+import React, { useEffect, useImperativeHandle, forwardRef, useState } from 'react';
+import { Modal, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
-const TIMING_CONFIG = {
-    duration: 200,
-    easing: Easing.out(Easing.cubic),
+export type ModalOverlayRef = {
+    show: (content: React.ReactNode) => void;
+    hide: () => void;
 };
 
-export function ModalOverlay({
-    visible,
-    children,
-    onDismiss,
-    onBackPress,
-    contentContainerStyle,
-}: {
-    visible: boolean;
-    children: React.ReactNode;
+export const ModalOverlay = forwardRef<ModalOverlayRef, {
     onDismiss?: () => void;
     onBackPress?: () => void;
     contentContainerStyle?: StyleProp<ViewStyle>;
-}) {
-    const progress = useSharedValue(0);
-    const [mounted, setMounted] = useState(visible);
+}>(function ModalOverlay({
+    onDismiss,
+    onBackPress,
+    contentContainerStyle,
+}, ref) {
+    const [content, setContent] = useState<React.ReactNode | null>(null);
+    const [visible, setVisible] = useState(false);
 
-    // 处理 Android 返回按钮
+    useImperativeHandle(ref, () => ({
+        show: (next: React.ReactNode) => {
+            setContent(next);
+            setVisible(true);
+        },
+        hide: () => {
+            setVisible(false);
+        },
+    }), []);
+
     useEffect(() => {
-        if (!visible) return;
-
-        const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-            if (onBackPress) {
-                onBackPress();
-                return true; // 阻止默认行为（返回上一页）
-            }
-            return false;
-        });
-
-        return () => backHandler.remove();
-    }, [visible, onBackPress]);
-
-    useEffect(() => {
-        if (visible) {
-            setMounted(true);
-            progress.value = withTiming(1, TIMING_CONFIG);
-        } else {
-            progress.value = withTiming(0, { duration: 150, easing: Easing.in(Easing.cubic) }, (finished) => {
-                if (finished) {
-                    runOnJS(setMounted)(false);
-                    if (onDismiss) runOnJS(onDismiss)();
-                }
-            });
+        if (!visible && onDismiss) {
+            onDismiss();
         }
     }, [visible, onDismiss]);
 
-    const backdropStyle = useAnimatedStyle(() => ({
-        opacity: progress.value * 0.5,
-    }));
-
-    const contentStyle = useAnimatedStyle(() => ({
-        opacity: progress.value,
-        shadowOpacity: 0.22 * progress.value,
-        elevation: 10 * progress.value,
-        transform: [
-            { translateY: interpolate(progress.value, [0, 1], [12, 0]) },
-            { scale: interpolate(progress.value, [0, 1], [0.98, 1]) },
-        ],
-    }));
-
-    if (!mounted) return null;
+    if (!visible && !content) {
+        return null;
+    }
 
     return (
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-            <Animated.View
-                style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}
-            >
-                <Pressable style={StyleSheet.absoluteFill} />
-            </Animated.View>
+        <Modal
+            transparent
+            visible={visible}
+            animationType="fade"
+            statusBarTranslucent
+            onRequestClose={() => {
+                // Android 返回键：优先走自定义回调
+                if (onBackPress) onBackPress();
+                else if (onDismiss) onDismiss();
+            }}
+        >
+            <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+                <View style={[StyleSheet.absoluteFill, styles.backdrop]}>
+                    <Pressable style={StyleSheet.absoluteFill} onPress={onBackPress || onDismiss} />
+                </View>
 
-            <View style={styles.center}>
-                <Animated.View style={[styles.content, styles.card, contentContainerStyle, contentStyle]}>
-                    {children}
-                </Animated.View>
+                <View style={styles.center}>
+                    <View style={[styles.content, styles.card, contentContainerStyle]}>
+                        {content}
+                    </View>
+                </View>
             </View>
-        </View>
+        </Modal>
     );
-}
+});
 
 const styles = StyleSheet.create({
     backdrop: {
-        backgroundColor: '#000',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
     },
     center: {
         flex: 1,
@@ -111,5 +84,7 @@ const styles = StyleSheet.create({
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 8 },
         shadowRadius: 16,
+        shadowOpacity: 0.22,
+        elevation: 10,
     },
 });

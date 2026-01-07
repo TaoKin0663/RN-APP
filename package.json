@@ -26,6 +26,7 @@
     "@reown/appkit-solana-react-native": "2.0.1",
     "@reown/appkit-wagmi-react-native": "2.0.1",
     "@safe-global/protocol-kit": "^6.1.2",
+    "@sumsub/react-native-mobilesdk-module": "^1.40.2",
     "@tanstack/react-query": "^5.81.5",
     "@walletconnect/react-native-compat": "2.22.4",
     "axios": "^1.13.2",
