@@ -1,8 +1,9 @@
 import '@walletconnect/react-native-compat';
 import { AppKitButton } from '@reown/appkit-react-native';
 import { Image } from 'expo-image';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
+import { useAccount } from 'wagmi';
 
 import { MobileWave } from '@/components/MobileWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
@@ -11,8 +12,16 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { WalletInfoView } from '@/components/WalletInfoView';
 import { reownDarkGray, reownOrange } from '@/constants/Colors';
+import { formatAddress } from '@/utils/common';
 
 export default function HomeScreen() {
+  const { address, isConnected } = useAccount();
+
+  // 调试：在控制台输出连接状态，帮助排查热更新问题
+  useEffect(() => {
+    console.log('Wallet connection status:', { address, isConnected });
+  }, [address, isConnected]);
+
   return (
     <>
       <ParallaxScrollView
@@ -37,6 +46,14 @@ export default function HomeScreen() {
           <MobileWave />
         </ThemedView>
         <WalletInfoView />
+        
+        {/* 显示钱包地址 */}
+        {address && (
+          <View style={styles.addressContainer}>
+            <ThemedText style={styles.addressLabel}>钱包地址:</ThemedText>
+            <ThemedText style={styles.addressText}>{formatAddress(address)}</ThemedText>
+          </View>
+        )}
         
         <View style={styles.appKitButtonContainer}>
           <AppKitButton connectStyle={styles.appKitButton} label='Connect Wallet' />
@@ -86,5 +103,18 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'flex-end',
     gap: 10,
+  },
+  addressContainer: {
+    marginTop: 16,
+    alignItems: 'center',
+    gap: 4,
+  },
+  addressLabel: {
+    fontSize: 12,
+    opacity: 0.7,
+  },
+  addressText: {
+    fontSize: 14,
+    fontFamily: 'KHTekaMono',
   },
 });

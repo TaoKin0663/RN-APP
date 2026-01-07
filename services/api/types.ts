@@ -50,6 +50,27 @@ export interface IChain {
   updated_at: string | null;
 }
 
+export interface ISalePlan {
+  // 总代币数量
+  total_tokens: string;
+  // 价格
+  price: string;
+  // 有效期
+  validity_period: number;
+  // 分红间隔
+  dividend_interval: number;
+  // 开始时间
+  start_time: string;
+}
+
+export interface IStakingPlan {
+  early_redemption_fee: number;
+  lock_period_days: number;
+  max_per_user: string;
+  max_total_supply: string;
+  min_per_user: string;
+}
+
 export interface IToken {
   // 主键 ID（UUID）
   id: string;
@@ -97,6 +118,9 @@ export interface IToken {
   updated_at: string;
   // 链信息
   chain?: IChain | null;
+  // 销售计划
+  sale_plan: ISalePlan | null;
+  staking_plan: IStakingPlan | null;
 }
 
 export type AuthingUserInfoType = {

@@ -10,8 +10,15 @@ import { TokenIcon } from '@/components/TokenIcon';
 import { useRouter } from 'expo-router';
 import { NetworkSelector, type Network } from '@/components/NetworkSelector';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { formatUnits } from 'viem';
 
 type TabType = 'regular' | 'stake' | 'equity';
+
+enum TokenType {
+  REGULAR_BENEFITS = "REGULAR_BENEFITS",
+  STAKE = "STAKE",
+  EQUITY = "EQUITY",
+}
 
 function TokenItem({ token }: { token: IToken }) {
   const { colorScheme } = useTheme();
@@ -41,8 +48,30 @@ function TokenItem({ token }: { token: IToken }) {
     return num.toFixed(2);
   };
 
+  // 格式化价格（使用 viem 的 formatUnits 处理精度）
+  const formatPrice = (price: string, decimals: number) => {
+    try {
+      const formatted = formatUnits(BigInt(price), decimals);
+      // 转换为数字并移除末尾的0
+      const num = parseFloat(formatted);
+      // 如果是整数，直接返回整数部分
+      if (num % 1 === 0) {
+        return num.toString();
+      }
+      // 否则保留最多6位小数，但移除末尾的0
+      return num.toFixed(6).replace(/\.?0+$/, '');
+    } catch (error) {
+      // 如果格式化失败，返回原始值
+      console.error('格式化价格失败:', error);
+      return price;
+    }
+  };
+
   const handlePress = () => {
-    // router.push('/login');
+    router.push({
+      pathname: '/token-detail',
+      params: { tokenAddress: token.address }
+    });
   };
 
   return (
@@ -75,7 +104,11 @@ function TokenItem({ token }: { token: IToken }) {
             <Text className="text-xs" style={{ color: colors.textTertiary }}>{formatAddress(token.address)}</Text>
           </View>
         </View>
-        <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+        {token.type !== TokenType.STAKE && token.sale_plan?.price && (
+          <Text className="text-xl font-bold" style={{ color: colors.primary }}>
+            ${formatPrice(token.sale_plan.price, token.decimals)}
+          </Text>
+        )}
       </View>
 
       <View className="gap-3">
@@ -84,13 +117,13 @@ function TokenItem({ token }: { token: IToken }) {
         </Text>
 
         <View className="flex-row gap-3">
-          <View 
+          <View
             className="flex-1 rounded-lg p-3 gap-1"
           >
             <Text className="text-xs" style={{ color: colors.textTertiary }}>总供应量</Text>
             <Text className="text-base font-semibold" style={{ color: colors.primary }}>{formatTotalSupply(token.total_supply)}</Text>
           </View>
-          <View 
+          <View
             className="flex-1 rounded-lg p-3 gap-1"
           >
             <Text className="text-xs" style={{ color: colors.textTertiary }}>精度</Text>
@@ -183,7 +216,7 @@ export default function TabTwoScreen() {
   const onTabLayout = (tab: TabType, event: any) => {
     const { x, width } = event.nativeEvent.layout;
     tabLayouts[tab] = { x, width };
-    
+
     // 检查是否所有标签都已测量完成
     const allLayoutsReady = tabLayouts['regular'] && tabLayouts['stake'] && tabLayouts['equity'];
     if (allLayoutsReady && !layoutsReady) {
@@ -198,15 +231,15 @@ export default function TabTwoScreen() {
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       {/* 顶部导航栏 */}
-      <View 
+      <View
         className="flex-row items-center justify-between px-4 pb-3 pt-3"
-        style={{ 
+        style={{
           backgroundColor: colors.background
         }}
       >
         <Text className="text-lg font-semibold" style={{ color: colors.text }}>交易</Text>
         <View className="flex-row items-center gap-3">
-          <TouchableOpacity 
+          <TouchableOpacity
             className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-[20px]"
             style={{ backgroundColor: colors.backgroundSecondary }}
           >
@@ -214,8 +247,8 @@ export default function TabTwoScreen() {
             <Text className="text-sm" style={{ color: colors.textSecondary }}>搜索</Text>
           </TouchableOpacity>
           <TouchableOpacity className="p-1">
-            <Image 
-              source={require('@/assets/images/customer-service.png')} 
+            <Image
+              source={require('@/assets/images/customer-service.png')}
               style={{ width: 24, height: 24 }}
             />
           </TouchableOpacity>
@@ -226,7 +259,7 @@ export default function TabTwoScreen() {
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 92 }}
         showsVerticalScrollIndicator={false}
-        // overScrollMode={Platform.OS === 'android' ? 'always' : undefined}  // Android 回弹
+      // overScrollMode={Platform.OS === 'android' ? 'always' : undefined}  // Android 回弹
       >
         {/* 网络选择器 - 在客服图标下方 */}
         <View className="items-end mb-4">
@@ -277,7 +310,7 @@ export default function TabTwoScreen() {
               Equity
             </Text>
           </TouchableOpacity>
-          
+
           {/* 滑动指示器 */}
           {layoutsReady && tabLayouts['regular'] && tabLayouts['stake'] && tabLayouts['equity'] && (
             <Animated.View

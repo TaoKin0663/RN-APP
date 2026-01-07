@@ -109,8 +109,8 @@ export function Button({
   const handlePressIn = () => {
     if (props.disabled) return;
     
-    // 点击时放大效果
-    scale.value = withSpring(1.08, {
+    // 点击时轻微放大效果
+    scale.value = withSpring(1.04, {
       damping: 15,
       stiffness: 400,
       mass: 0.4,
@@ -130,16 +130,16 @@ export function Button({
   const handlePressOut = () => {
     if (props.disabled) return;
     
-    // 松手时 Q 弹效果：降低阻尼，增加弹跳感
+    // 松手时自然回弹效果：增加阻尼，减少弹跳，让动画更平滑
     scale.value = withSpring(1, {
-      damping: 8, // 低阻尼，产生更多回弹
-      stiffness: 500, // 高刚度，快速响应
-      mass: 0.3, // 小质量，更轻快
+      damping: 22, // 增加阻尼，减少回弹，让动画更自然
+      stiffness: 320, // 降低刚度，让动画不那么快
+      mass: 0.5, // 增加质量，让动画更有重量感
     });
     // 恢复透明度，根据 disabled 状态决定最终值
     opacity.value = withSpring(props.disabled ? 0.5 : 1, {
-      damping: 12,
-      stiffness: 400,
+      damping: 20,
+      stiffness: 300,
     });
   };
 

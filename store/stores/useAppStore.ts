@@ -19,6 +19,8 @@ interface AppState {
   isOnline: boolean;
   // 是否显示引导页
   showOnboarding: boolean;
+  // 当前选中的账户地址
+  selectedAccountAddress: string | null;
 }
 
 /**
@@ -37,6 +39,8 @@ interface AppActions {
   setShowOnboarding: (show: boolean) => void;
   // 重置应用设置（保留主题等基本设置）
   resetAppSettings: () => void;
+  // 设置当前选中的账户地址
+  setSelectedAccountAddress: (address: string | null) => void;
 }
 
 const initialState: AppState = {
@@ -45,6 +49,7 @@ const initialState: AppState = {
   language: 'zh-CN',
   isOnline: true,
   showOnboarding: true,
+  selectedAccountAddress: null,
 };
 
 /**
@@ -84,6 +89,11 @@ export const useAppStore: StateCreator<AppState & AppActions> = (set) => ({
       isFirstLaunch: true,
       showOnboarding: true,
     });
+  },
+
+  // 设置当前选中的账户地址
+  setSelectedAccountAddress: (address) => {
+    set({ selectedAccountAddress: address });
   },
 });
 
