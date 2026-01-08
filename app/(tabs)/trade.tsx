@@ -1,4 +1,4 @@
-import { TouchableOpacity, View, Text, ScrollView, ActivityIndicator, Platform, Image, Animated } from 'react-native';
+import { TouchableOpacity, View, Text, ScrollView, ActivityIndicator, Platform, Image, Animated, RefreshControl } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/config/theme';
@@ -143,6 +143,7 @@ export default function TabTwoScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('regular');
   const [tokens, setTokens] = useState<IToken[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const indicatorAnim = useRef(new Animated.Value(0)).current;
   const tabLayouts = useRef<{ [key: string]: { x: number; width: number } }>({}).current;
@@ -166,27 +167,41 @@ export default function TabTwoScreen() {
     // 可以在这里添加其他逻辑，比如更新 API 请求参数等
   }, []);
 
-  useEffect(() => {
-    const fetchTokenList = async () => {
-      try {
+  // 获取代币列表的函数
+  const fetchTokenList = useCallback(async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
         setLoading(true);
-        setError(null);
-        const response = await api.token.getTokenList();
-        if (response.success && response.data) {
-          setTokens(response.data.tokens || []);
-        } else {
-          setError(response.message || '获取代币列表失败');
-        }
-      } catch (err) {
-        setError('网络请求失败，请稍后重试');
-        console.error('获取代币列表失败:', err);
-      } finally {
+      }
+      setError(null);
+      const response = await api.token.getTokenList();
+      if (response.success && response.data) {
+        setTokens(response.data.tokens || []);
+      } else {
+        setError(response.message || '获取代币列表失败');
+      }
+    } catch (err) {
+      setError('网络请求失败，请稍后重试');
+      console.error('获取代币列表失败:', err);
+    } finally {
+      if (isRefresh) {
+        setRefreshing(false);
+      } else {
         setLoading(false);
       }
-    };
-
-    fetchTokenList();
+    }
   }, []);
+
+  // 下拉刷新处理函数
+  const onRefresh = useCallback(() => {
+    fetchTokenList(true);
+  }, [fetchTokenList]);
+
+  useEffect(() => {
+    fetchTokenList(false);
+  }, [fetchTokenList]);
 
   // 根据 activeTab 过滤代币
   const filteredTokens = tokens.filter(token => {
@@ -259,6 +274,14 @@ export default function TabTwoScreen() {
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 92 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       // overScrollMode={Platform.OS === 'android' ? 'always' : undefined}  // Android 回弹
       >
         {/* 网络选择器 - 在客服图标下方 */}

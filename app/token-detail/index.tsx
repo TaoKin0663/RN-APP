@@ -1,4 +1,4 @@
-import { TouchableOpacity, View, Text, ScrollView, ActivityIndicator, TextInput, Platform, Keyboard, Alert } from 'react-native';
+import { TouchableOpacity, View, Text, ScrollView, ActivityIndicator, TextInput, Platform, Keyboard, Alert, InteractionManager } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/config/theme';
@@ -8,15 +8,17 @@ import { api } from '@/services/api/api';
 import type { IToken, KYCStatusResponse } from '@/services/api/types';
 import { TokenIcon } from '@/components/TokenIcon';
 import { Button } from '@/components/Button';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useRouter, useLocalSearchParams, Stack, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { formatUnits } from 'viem';
+import { formatUnits, parseUnits, encodeFunctionData, erc20Abi, type Address } from 'viem';
 import * as Clipboard from 'expo-clipboard';
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop, BottomSheetBackdropProps } from "@gorhom/bottom-sheet";
 import { useModal } from '@/components/ui/Modal';
 import { ModalContent } from '@/components/ui/ModalContent';
 import { useAppStore } from '@/store';
 import { startKYCVerificationWithAlert } from '@/utils/kycVerification';
+import { tokenABI } from "@/utils/ABI/token";
+import { useAccount, useEstimateGas, useGasPrice, useChainId, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 
 enum TokenType {
     REGULAR_BENEFITS = "REGULAR_BENEFITS",
@@ -24,12 +26,31 @@ enum TokenType {
     EQUITY = "EQUITY",
 }
 
+/**
+ * KYC 状态类型枚举
+ * 用于标识用户 KYC 的不同场景
+ */
+export enum KYCStatusType {
+    /** 新用户且未通过 KYC（链上链下） */
+    NEW_USER = 6,
+    /** 老用户在该工厂尚未完成 KYC（切换工厂） */
+    SWITCH_FACTORY = 7,
+    /** 老用户换 Token（切换token） */
+    SWITCH_TOKEN = 8,
+}
+
+
+
 export default function TokenDetailScreen() {
     const { colorScheme } = useTheme();
     const colors = Colors[colorScheme ?? 'dark'];
     const router = useRouter();
     const { tokenAddress } = useLocalSearchParams<{ tokenAddress: string }>();
     const selectedAccountAddress = useAppStore(state => state.selectedAccountAddress);
+    const { address: accountAddress, isConnected } = useAccount();
+    const chainId = useChainId();
+    // 使用选中的账户地址，如果没有则使用连接的钱包地址
+    const effectiveAccountAddress = selectedAccountAddress || accountAddress;
     const [token, setToken] = useState<IToken | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -119,17 +140,326 @@ export default function TokenDetailScreen() {
         }
     };
 
-    const check = async () => {
-        if(!token) {
-            return;
+    // 计算要购买的代币数量（investmentAmount 是 token 数量，不是 USD 金额）
+    const calculateTokenAmount = useMemo(() => {
+        if (!token || !investmentAmount) {
+            return null;
+        }
+        try {
+            const tokenAmount = parseFloat(investmentAmount);
+            if (isNaN(tokenAmount) || tokenAmount <= 0) {
+                return null;
+            }
+            // 将 token 数量转换为最小单位（考虑精度）
+            return parseUnits(tokenAmount.toFixed(token.decimals), token.decimals);
+        } catch (error) {
+            console.error('计算代币数量失败:', error);
+            return null;
+        }
+    }, [token, investmentAmount]);
+
+    // 读取 USDT token 地址
+    const { data: usdtTokenAddress } = useReadContract({
+        address: tokenAddress as Address | undefined,
+        abi: tokenABI,
+        functionName: 'usdtToken',
+        query: {
+            enabled: !!tokenAddress && isConnected,
+        },
+    });
+
+    // 读取 USDT 精度（不同 USDT 合约可能是 6 或 18）
+    const { data: usdtDecimals } = useReadContract({
+        address: usdtTokenAddress as Address | undefined,
+        abi: erc20Abi,
+        functionName: 'decimals',
+        query: {
+            enabled: !!usdtTokenAddress && isConnected,
+        },
+    });
+
+    // 计算需要的 USDT 数量（用 BigInt 精确计算，避免浮点误差）
+    // 约定：sale_plan.price 是“每 1 个 token（按 token.decimals）”的价格（同样按 token.decimals 缩放）
+    // 需要的 USDT = tokenAmountBase * priceRaw / 10^token.decimals，然后按 usdtDecimals 进行缩放对齐
+    const calculateUsdtAmount = useMemo(() => {
+        if (!token?.sale_plan?.price || !calculateTokenAmount || usdtDecimals === undefined) {
+            return null;
+        }
+        try {
+            const priceRaw = BigInt(token.sale_plan.price);
+            const tokenDecimals = token.decimals;
+            const pow10 = (n: number) => 10n ** BigInt(n);
+
+            // 先算出以 token.decimals 作为缩放的“价格*数量”结果
+            let cost = (calculateTokenAmount * priceRaw) / pow10(tokenDecimals);
+
+            // 将 cost 缩放到 USDT 的 decimals
+            const diff = usdtDecimals - tokenDecimals;
+            if (diff > 0) cost = cost * pow10(diff);
+            if (diff < 0) cost = cost / pow10(-diff);
+
+            return cost;
+        } catch (error) {
+            console.error('计算 USDT 数量失败:', error);
+            return null;
+        }
+    }, [token?.sale_plan?.price, token?.decimals, calculateTokenAmount, usdtDecimals]);
+
+    // 检查 USDT allowance
+    const { data: usdtAllowance, refetch: refetchAllowance, isLoading: isLoadingAllowance, error: allowanceError } = useReadContract({
+        address: usdtTokenAddress as Address | undefined,
+        abi: erc20Abi,
+        functionName: 'allowance',
+        args: effectiveAccountAddress && tokenAddress
+            ? [effectiveAccountAddress as Address, tokenAddress as Address]
+            : undefined,
+        query: {
+            enabled: !!usdtTokenAddress && !!effectiveAccountAddress && !!tokenAddress && isConnected,
+            refetchInterval: 5000, // 每5秒刷新一次
+        },
+    });
+
+    // 调试 allowance 状态
+    useEffect(() => {
+        console.log('Allowance 状态:', {
+            usdtTokenAddress,
+            usdtDecimals,
+            effectiveAccountAddress,
+            tokenAddress,
+            isConnected,
+            isLoadingAllowance,
+            usdtAllowance: usdtAllowance?.toString(),
+            allowanceError,
+            calculateUsdtAmount: calculateUsdtAmount?.toString(),
+        });
+    }, [usdtTokenAddress, usdtDecimals, effectiveAccountAddress, tokenAddress, isConnected, isLoadingAllowance, usdtAllowance, allowanceError, calculateUsdtAmount]);
+
+    // 执行 approve
+    const { writeContract: writeApprove, isPending: isApproving, data: approveTxHash, error: approveError } = useWriteContract();
+
+    // 等待 approve 交易确认
+    const { data: approveReceipt, isLoading: isWaitingApprove } = useWaitForTransactionReceipt({
+        hash: approveTxHash,
+        query: {
+            enabled: !!approveTxHash,
+            retry: 3,
+            retryDelay: 2000,
+        },
+    });
+
+    // approve 交易确认成功后刷新 allowance
+    useEffect(() => {
+        if (approveReceipt && approveReceipt.status === 'success') {
+            console.log('Approve 交易确认成功，刷新 allowance');
+            refetchAllowance();
+        }
+    }, [approveReceipt, refetchAllowance]);
+
+    // 处理 approve 错误
+    useEffect(() => {
+        if (approveError) {
+            console.error('Approve 交易失败:', approveError);
+            Alert.alert('授权失败', approveError.message || 'USDT 授权失败，请重试');
+        }
+    }, [approveError]);
+
+    // 执行购买交易
+    const { writeContract: writePurchase, isPending: isPurchasing, data: purchaseTxHash, error: purchaseError } = useWriteContract();
+
+    // 购买交易发送成功后，跳转到交易进度页面
+    useEffect(() => {
+        if (purchaseTxHash) {
+            bottomSheetRef.current?.close();
+            router.push({
+                pathname: '/transaction-progress',
+                params: { hash: purchaseTxHash },
+            });
+        }
+    }, [purchaseTxHash, router]);
+
+    // 处理购买错误
+    useEffect(() => {
+        if (purchaseError) {
+            console.error('购买交易失败:', purchaseError);
+            Alert.alert('交易失败', purchaseError.message || '购买失败，请重试');
+        }
+    }, [purchaseError]);
+
+    // 检查是否需要 approve
+    // null 表示还在检查中，true 表示需要 approve，false 表示不需要
+    const needsApprove = useMemo(() => {
+        // 如果数据还没准备好，返回 null（还在检查中）
+        if (usdtAllowance === undefined || calculateUsdtAmount === null) {
+            console.log('needsApprove: 数据未准备好', { usdtAllowance, calculateUsdtAmount });
+            return null;
+        }
+        try {
+            // 如果 allowance 为 0 或者小于需要的数量，则需要 approve
+            const needs = usdtAllowance === 0n || usdtAllowance < calculateUsdtAmount;
+            console.log('needsApprove: 计算结果', { 
+                usdtAllowance: usdtAllowance.toString(), 
+                calculateUsdtAmount: calculateUsdtAmount.toString(),
+                needs 
+            });
+            return needs;
+        } catch (error) {
+            console.error('检查 allowance 失败:', error);
+            return null;
+        }
+    }, [usdtAllowance, calculateUsdtAmount]);
+
+    // 构建 approve 交易数据
+    const approveTransactionData = useMemo(() => {
+        if (!usdtTokenAddress || !tokenAddress || !calculateUsdtAmount || !effectiveAccountAddress || needsApprove !== true) {
+            return undefined;
+        }
+        try {
+            return {
+                to: usdtTokenAddress as Address,
+                data: encodeFunctionData({
+                    abi: erc20Abi,
+                    functionName: 'approve',
+                    args: [tokenAddress as Address, calculateUsdtAmount],
+                }),
+            } as const;
+        } catch (error) {
+            console.error('构建 approve 交易数据失败:', error);
+            return undefined;
+        }
+    }, [usdtTokenAddress, tokenAddress, calculateUsdtAmount, effectiveAccountAddress, needsApprove]);
+
+    // 构建 purchaseTokens 交易数据用于估算 gas
+    const transactionData = useMemo(() => {
+        // 只有在不需要 approve（needsApprove === false）时才构建交易数据
+        if (!token || !tokenAddress || !calculateTokenAmount || !effectiveAccountAddress || needsApprove !== false) {
+            return undefined;
+        }
+        try {
+            return {
+                to: tokenAddress as Address,
+                data: encodeFunctionData({
+                    abi: tokenABI,
+                    functionName: 'purchaseTokens',
+                    args: [calculateTokenAmount],
+                }),
+                account: effectiveAccountAddress as Address,
+            } as const;
+        } catch (error) {
+            console.error('构建交易数据失败:', error);
+            return undefined;
+        }
+    }, [token, tokenAddress, calculateTokenAmount, effectiveAccountAddress, needsApprove]);
+
+    // 估算 gas limit（需要钱包已连接，且不需要 approve 或已 approve）
+    // needsApprove 为 null 时表示还在检查，为 false 时表示不需要 approve，为 true 时表示需要 approve
+    const shouldEstimateGas = isConnected && needsApprove === false && !!transactionData && !!effectiveAccountAddress && !!tokenAddress && !!calculateTokenAmount && !!transactionData.to && !!transactionData.data;
+    
+    // 调试信息
+    useEffect(() => {
+        console.log('Gas 估算状态:', {
+            isConnected,
+            needsApprove,
+            shouldEstimateGas,
+            hasTransactionData: !!transactionData,
+            hasAccount: !!effectiveAccountAddress,
+            accountAddress: effectiveAccountAddress,
+            hasTokenAddress: !!tokenAddress,
+            tokenAddress,
+            hasTokenAmount: !!calculateTokenAmount,
+            tokenAmount: calculateTokenAmount?.toString(),
+            hasUsdtAmount: !!calculateUsdtAmount,
+            usdtAmount: calculateUsdtAmount?.toString(),
+            usdtTokenAddress,
+            usdtAllowance: usdtAllowance?.toString(),
+            to: transactionData?.to,
+            hasData: !!transactionData?.data,
+        });
+    }, [isConnected, needsApprove, shouldEstimateGas, transactionData, effectiveAccountAddress, tokenAddress, calculateTokenAmount, calculateUsdtAmount, usdtTokenAddress, usdtAllowance]);
+    
+    // 只有在明确不需要 approve 时才估算 gas
+    const canEstimateGas = shouldEstimateGas && needsApprove === false;
+    
+    const { data: estimatedGas, isLoading: isEstimatingGas, error: gasEstimateError, status: gasEstimateStatus } = useEstimateGas(
+        canEstimateGas && transactionData
+            ? {
+                  to: transactionData.to,
+                  data: transactionData.data,
+                  query: {
+                      refetchInterval: 10000, // 每10秒自动刷新
+                      retry: 2, // 重试2次
+                  },
+              }
+            : undefined
+    );
+
+    // 调试估算结果
+    useEffect(() => {
+        console.log('Gas 估算结果:', {
+            needsApprove,
+            canEstimateGas,
+            shouldEstimateGas,
+            usdtAllowance: usdtAllowance?.toString(),
+            calculateUsdtAmount: calculateUsdtAmount?.toString(),
+            status: gasEstimateStatus,
+            isLoading: isEstimatingGas,
+            estimatedGas: estimatedGas?.toString(),
+            error: gasEstimateError,
+        });
+    }, [needsApprove, canEstimateGas, shouldEstimateGas, usdtAllowance, calculateUsdtAmount, gasEstimateStatus, isEstimatingGas, estimatedGas, gasEstimateError]);
+
+    // 获取 gas price
+    const { data: gasPrice, isLoading: isLoadingGasPrice } = useGasPrice({
+        query: {
+            refetchInterval: 10000, // 每10秒自动刷新
+        },
+    });
+
+    // 计算 gas 费用（原生代币）
+    const gasFeeInNative = useMemo(() => {
+        if (!estimatedGas || !gasPrice) {
+            return null;
+        }
+        try {
+            // gas 费用 = gas limit * gas price
+            const gasFeeInWei = estimatedGas * gasPrice;
+            // 转换为原生代币（通常是 18 位精度）
+            const gasFeeInNative = formatUnits(gasFeeInWei, 18);
+            return gasFeeInNative;
+        } catch (error) {
+            console.error('计算 gas 费用失败:', error);
+            return null;
+        }
+    }, [estimatedGas, gasPrice]);
+
+    // 获取原生代币符号
+    const nativeCurrencySymbol = useMemo(() => {
+        if (token?.chain?.native_currency_symbol) {
+            return token.chain.native_currency_symbol;
+        }
+        // 根据 chainId 返回默认符号
+        const chainIdNum = chainId || (token?.chain?.chain_id ? parseInt(token.chain.chain_id, 10) : null);
+        if (chainIdNum === 1 || chainIdNum === 11155111) return 'ETH'; // Ethereum/Sepolia
+        if (chainIdNum === 137) return 'MATIC'; // Polygon
+        if (chainIdNum === 56) return 'BNB'; // BSC
+        if (chainIdNum === 10) return 'ETH'; // Optimism
+        if (chainIdNum === 8453) return 'ETH'; // Base
+        if (chainIdNum === 42161) return 'ETH'; // Arbitrum
+        return 'ETH'; // 默认
+    }, [token?.chain, chainId]);
+
+    const check = async (): Promise<boolean> => {
+        if (!token) {
+            return false;
         }
         if (!selectedAccountAddress) {
             console.error('未选择账户地址');
-            return;
+            return false;
         }
         const KYCStatusResponse = await api.kyc.getKycStatus({ tokenAddress, userAddressToCheck: selectedAccountAddress });
+        console.log("KYCStatusResponse----------------------")
+        console.log(KYCStatusResponse);
         if (!KYCStatusResponse.success) {
-            return;
+            return false;
         }
         if (!KYCStatusResponse.data.isVerified) {
             show(
@@ -147,30 +477,39 @@ export default function TokenDetailScreen() {
                                 Alert.alert('错误', '缺少必要参数');
                                 return;
                             }
-                            // 直接调用 KYC 验证方法
-                            await startKYCVerificationWithAlert(
-                                {
-                                    walletAddress: selectedAccountAddress,
-                                    tokenAddress: tokenAddress,
-                                    factoryAddress: token.factory_address,
-                                    chainId: '11155111',
-                                },
-                                () => {
-                                    // 验证成功回调，可以刷新状态
-                                    console.log('KYC 验证成功');
-                                },
-                                (error) => {
-                                    // 验证失败回调
-                                    console.log('KYC 验证失败:', error);
-                                }
-                            );
+                            if (KYCStatusResponse.data.type == KYCStatusType.NEW_USER) {
+                                // 直接调用 KYC 验证方法
+                                await startKYCVerificationWithAlert(
+                                    {
+                                        walletAddress: selectedAccountAddress,
+                                        tokenAddress: tokenAddress,
+                                        factoryAddress: token.factory_address,
+                                        chainId: '11155111',
+                                    },
+                                    () => {
+                                        // 验证成功回调，可以刷新状态
+                                        console.log('KYC 验证成功');
+                                    },
+                                    (error) => {
+                                        // 验证失败回调
+                                        console.log('KYC 验证失败:', error);
+                                    }
+                                );
+                            } else {
+                                await api.kyc.onchainKYC({
+                                    type: KYCStatusResponse.data.type?.toString() || "",
+                                    token_address: tokenAddress,
+                                    token_type: token.type || "",
+                                    factory_address: token.factory_address || "",
+                                })
+                            }
                         }}>
                             去认证
                         </Button>
                     ]}
                 />
             );
-            return;
+            return false;
         }
         if (KYCStatusResponse.data.walletaddress != selectedAccountAddress) {
             show(
@@ -184,38 +523,103 @@ export default function TokenDetailScreen() {
                     }
                 />
             );
-            return;
+            return false;
         }
+        // 所有检查通过
+        return true;
+    }
+
+
+    const handleInvest = () => {
+        console.log('handleInvest');
     }
 
     // 获取代币详情
-    useEffect(() => {
-        const fetchTokenDetail = async () => {
-            if (!tokenAddress) {
-                setError('缺少代币地址参数');
-                setLoading(false);
-                return;
-            }
+    // useEffect(() => {
+    //     const fetchTokenDetail = async () => {
+    //         console.log("请求代币详情----------------------")
+    //         if (!tokenAddress) {
+    //             setError('缺少代币地址参数');
+    //             setLoading(false);
+    //             return;
+    //         }
 
-            try {
-                setLoading(true);
-                setError(null);
-                const response = await api.token.getTokenList({ tokenAddress });
-                if (response.success && response.data && response.data.tokens && response.data.tokens.length > 0) {
-                    setToken(response.data.tokens[0]);
-                } else {
-                    setError(response.message || '获取代币详情失败');
+    //         try {
+    //             setLoading(true);
+    //             setError(null);
+    //             const response = await api.token.getTokenList({ tokenAddress });
+    //             if (response.success && response.data && response.data.tokens && response.data.tokens.length > 0) {
+    //                 setToken(response.data.tokens[0]);
+    //             } else {
+    //                 setError(response.message || '获取代币详情失败');
+    //             }
+    //         } catch (err) {
+    //             setError('网络请求失败，请稍后重试');
+    //             console.error('获取代币详情失败:', err);
+    //         } finally {
+    //             setLoading(false);
+    //         }
+    //     };
+    //     setTimeout(() => {
+    //         fetchTokenDetail();
+    //     }, 5000);
+    // }, [tokenAddress]);
+
+    useFocusEffect(
+        useCallback(() => {
+            let isMounted = true;
+
+            InteractionManager.runAfterInteractions(async () => {
+                console.log("请求代币详情----------------------")
+                if (!tokenAddress) {
+                    if (isMounted) {
+                        setError('缺少代币地址参数');
+                        setLoading(false);
+                    }
+                    return;
                 }
-            } catch (err) {
-                setError('网络请求失败，请稍后重试');
-                console.error('获取代币详情失败:', err);
-            } finally {
-                setLoading(false);
-            }
-        };
 
-        fetchTokenDetail();
-    }, [tokenAddress]);
+                try {
+                    if (isMounted) {
+                        setLoading(true);
+                        setError(null);
+                    }
+                    
+                    const response = await api.token.getTokenList({ tokenAddress });
+                    
+                    // 检查组件是否仍然挂载
+                    if (!isMounted) {
+                        return;
+                    }
+
+                    if (response.success && response.data && response.data.tokens && response.data.tokens.length > 0) {
+                        setToken(response.data.tokens[0]);
+                    } else {
+                        setError(response.message || '获取代币详情失败');
+                    }
+                } catch (err) {
+                    // 如果组件已卸载，不更新状态
+                    if (!isMounted) {
+                        return;
+                    }
+                    setError('网络请求失败，请稍后重试');
+                    console.error('获取代币详情失败:', err);
+                } finally {
+                    if (isMounted) {
+                        setLoading(false);
+                    }
+                }
+                console.log("优化后的请求代币详情----------------------")
+            });
+
+            // 清理函数：标记组件已卸载
+            // 注意：runAfterInteractions 返回的 Promise 无法直接取消
+            // 但通过 isMounted 标志可以避免在组件卸载后更新状态
+            return () => {
+                isMounted = false;
+            };
+        }, [tokenAddress])
+    );
 
     // 监听键盘显示/隐藏
     useEffect(() => {
@@ -571,10 +975,12 @@ export default function TokenDetailScreen() {
                                 minWidth: '100%',
                                 alignSelf: 'stretch',
                             }}
-                            onPress={() => {
+                            onPress={async () => {
                                 Keyboard.dismiss();
-                                // 延迟一帧再打开bottomSheet，确保键盘完全关闭
-                                check();
+                                const checkResult = await check();
+                                if (!checkResult) return;
+                                bottomSheetRef.current?.expand();
+                                // handleInvest();
                             }}
                         >
                             投资
@@ -603,57 +1009,111 @@ export default function TokenDetailScreen() {
                                 数量
                             </Text>
                             <Text className="text-base font-semibold" style={{ color: colors.text }}>
-                                100 RWA
+                                {investmentAmount && token
+                                    ? `${investmentAmount} ${token.symbol}`
+                                    : '--'}
                             </Text>
                         </View>
 
                         <View className="flex-row justify-between items-center mb-3">
                             <Text className="text-base" style={{ color: colors.textSecondary }}>
-                                单价
+                                价格
                             </Text>
                             <Text className="text-base font-semibold" style={{ color: colors.text }}>
-                                $1.23
+                                ${formatPrice(token?.sale_plan?.price || '0', token?.decimals || 18)}
                             </Text>
                         </View>
 
                         <View className="flex-row justify-between items-center mb-3">
                             <Text className="text-base" style={{ color: colors.textSecondary }}>
-                                手续费
+                                网络费用
                             </Text>
-                            <Text className="text-base font-semibold" style={{ color: colors.text }}>
-                                $1.20
-                            </Text>
-                        </View>
-
-                        <View
-                            className="h-px my-4"
-                            style={{ backgroundColor: colors.backgroundSecondary }}
-                        />
-
-                        <View className="flex-row justify-between items-center">
-                            <Text className="text-lg font-semibold" style={{ color: colors.text }}>
-                                合计
-                            </Text>
-                            <Text className="text-lg font-bold" style={{ color: colors.primary }}>
-                                $124.20
-                            </Text>
+                            {needsApprove === null ? (
+                                <View className="flex-row items-center">
+                                    <ActivityIndicator size="small" color={colors.primary} />
+                                    <Text className="text-xs ml-2" style={{ color: colors.textTertiary }}>
+                                        检查授权中...
+                                    </Text>
+                                </View>
+                            ) : needsApprove === true ? (
+                                <Text className="text-base font-semibold" style={{ color: colors.textTertiary }}>
+                                    需要先授权
+                                </Text>
+                            ) : !shouldEstimateGas ? (
+                                <Text className="text-base font-semibold" style={{ color: colors.textTertiary }}>
+                                    --
+                                </Text>
+                            ) : gasEstimateError ? (
+                                <Text className="text-base font-semibold" style={{ color: colors.textTertiary }}>
+                                    估算失败
+                                </Text>
+                            ) : isEstimatingGas || isLoadingGasPrice || gasFeeInNative === null ? (
+                                <View className="flex-row items-center">
+                                    <ActivityIndicator size="small" color={colors.primary} />
+                                    <Text className="text-xs ml-2" style={{ color: colors.textTertiary }}>
+                                        估算中...
+                                    </Text>
+                                </View>
+                            ) : (
+                                <Text className="text-base font-semibold" style={{ color: colors.text }}>
+                                    {parseFloat(gasFeeInNative).toFixed(6)} {nativeCurrencySymbol}
+                                </Text>
+                            )}
                         </View>
                     </View>
 
-                    <Button
-                        className="w-full mt-4"
-                        color="primary"
-                        style={{
-                            minWidth: '100%',
-                            alignSelf: 'stretch',
-                        }}
-                        onPress={() => {
-                            // TODO: 处理确认购买逻辑
-                            bottomSheetRef.current?.close();
-                        }}
-                    >
-                        确认购买
-                    </Button>
+                    {needsApprove === true ? (
+                        <Button
+                            className="w-full mt-4"
+                            color="primary"
+                            style={{
+                                minWidth: '100%',
+                                alignSelf: 'stretch',
+                            }}
+                            onPress={() => {
+                                if (approveTransactionData && usdtTokenAddress && tokenAddress && calculateUsdtAmount) {
+                                    writeApprove({
+                                        address: usdtTokenAddress as Address,
+                                        abi: erc20Abi,
+                                        functionName: 'approve',
+                                        args: [tokenAddress as Address, calculateUsdtAmount],
+                                    });
+                                }
+                            }}
+                            disabled={isApproving || isWaitingApprove || !approveTransactionData}
+                        >
+                            {isApproving ? '授权中...' : isWaitingApprove ? '等待确认中...' : '授权 USDT'}
+                        </Button>
+                    ) : (
+                        <Button
+                            className="w-full mt-4"
+                            color="primary"
+                            style={{
+                                minWidth: '100%',
+                                alignSelf: 'stretch',
+                            }}
+                            onPress={() => {
+                                if (!tokenAddress || !calculateTokenAmount) {
+                                    Alert.alert('错误', '缺少必要参数');
+                                    return;
+                                }
+                                if (needsApprove !== false) {
+                                    Alert.alert('提示', '请先完成 USDT 授权');
+                                    return;
+                                }
+                                // 调用 purchaseTokens 合约函数
+                                writePurchase({
+                                    address: tokenAddress as Address,
+                                    abi: tokenABI,
+                                    functionName: 'purchaseTokens',
+                                    args: [calculateTokenAmount],
+                                });
+                            }}
+                            disabled={isPurchasing || !tokenAddress || !calculateTokenAmount || needsApprove !== false}
+                        >
+                            {isPurchasing ? '交易中...' : '确认购买'}
+                        </Button>
+                    )}
                 </BottomSheetView>
             </BottomSheet>
         </SafeAreaView>

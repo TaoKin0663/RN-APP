@@ -54,6 +54,9 @@ export const api = {
                 '/api/kyc/status',
                 params,
             );
+        },
+        onchainKYC: (payload: { type: string; token_address: string; token_type: string; factory_address: string; claimTopic?: string; claimValue?: string; }) => {
+            return defaultApi.post<ApiResponse<any>>('/api/kyc/onchain', payload);
         }
     },
 } as const;
