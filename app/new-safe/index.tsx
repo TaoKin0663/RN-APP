@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,9 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Platform,
+  KeyboardAvoidingView,
+  Keyboard,
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { useAccount, useChains, useSendTransaction, useSwitchChain } from 'wagmi';
@@ -17,7 +20,7 @@ import Safe, {
   type SafeDeploymentConfig,
 } from '@safe-global/protocol-kit';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { RectButton } from 'react-native-gesture-handler';
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Animated, {
@@ -28,13 +31,21 @@ import Animated, {
   useSharedValue,
   type SharedValue,
 } from 'react-native-reanimated';
+import BottomSheet, { 
+  BottomSheetFlatList,
+  BottomSheetBackdrop,
+  BottomSheetView,
+  BottomSheetScrollView,
+  BottomSheetTextInput,
+  type BottomSheetBackdropProps,
+} from "@gorhom/bottom-sheet";
+import { BlurView } from 'expo-blur';
 
 import ChainIcon from '@/components/ChainIcon';
 import { useTheme } from '@/hooks/use-theme';
 import { Colors } from '@/config/theme';
 import { useAvatarGenerator } from '@/hooks/useAvatarGenerator';
 import Jazzicon from 'react-native-jazzicon';
-import { ThemedView } from '@/components/ThemedView';
 import { formatAddress } from '@/utils/common';
 import { Button } from '@/components/Button';
 
@@ -226,10 +237,97 @@ export default function NewSafe() {
   const [isCreating, setIsCreating] = useState(false);
   const [selectedChainIds, setSelectedChainIds] = useState<number[]>([]);
   const [deploySteps, setDeploySteps] = useState<ChainDeployStep[]>([]);
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [safeVersion] = useState<string>('1.4.1');
+  const [showAddOwnerModal, setShowAddOwnerModal] = useState(false);
+  const [tempOwnerAddress, setTempOwnerAddress] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const addOwnerSheetRef = useRef<BottomSheet>(null);
 
   const { generateAvatar } = useAvatarGenerator();
+
+  // BottomSheet 模糊遮罩组件 - 兼容 Android 和 iOS
+  const BlurBackdrop = React.memo((props: BottomSheetBackdropProps) => {
+    const { animatedIndex } = props;
+    
+    // 使用 Reanimated 创建动画样式
+    const containerAnimatedStyle = useAnimatedStyle(() => {
+      const opacity = interpolate(
+        animatedIndex.value,
+        [-1, 0],
+        [0, 1],
+        Extrapolation.CLAMP
+      );
+      return {
+        opacity,
+      };
+    });
+
+    return (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={1}
+        style={[
+          props.style,
+          {
+            backgroundColor: 'transparent', // 移除默认背景色
+          },
+        ]}
+      >
+        {Platform.OS === 'ios' ? (
+          // iOS 使用模糊效果
+          <BlurView
+            intensity={20}
+            tint="dark"
+            style={[
+              {
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+              },
+              containerAnimatedStyle,
+            ]}
+          />
+        ) : (
+          // Android 使用半透明背景
+          <Animated.View
+            style={[
+              {
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)', // 半透明黑色
+              },
+              containerAnimatedStyle,
+            ]}
+          />
+        )}
+      </BottomSheetBackdrop>
+    );
+  });
+
+  // BottomSheet 模糊遮罩渲染函数
+  const renderBackdrop = useCallback(
+    (props: BottomSheetBackdropProps) => <BlurBackdrop {...props} />,
+    []
+  );
+
+  const handlePresentModalPress = useCallback(() => {
+    bottomSheetRef.current?.snapToIndex(0);
+  }, []);
+
+  const handleSheetChange = useCallback((index: number) => {
+    if (index === -1) {
+      // Sheet 关闭
+    }
+  }, []);
 
   // 为所有 owners 生成头像映射
   const ownerAvatars = useMemo(() => {
@@ -259,6 +357,27 @@ export default function NewSafe() {
     setSelectedChainIds((prev) => (prev.length > 0 ? prev : [chainId]));
   }, [isConnected, chainId]);
 
+  // 监听键盘显示/隐藏
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
   const toggleChainInSelect = (chainId: number) => {
     setSelectedChainIds((prev) => {
       if (prev.includes(chainId)) {
@@ -268,6 +387,48 @@ export default function NewSafe() {
     });
   };
 
+  const handleOpenAddOwnerModal = useCallback(() => {
+    setTempOwnerAddress('');
+    addOwnerSheetRef.current?.snapToIndex(0);
+  }, []);
+
+  const handleCloseAddOwnerModal = useCallback(() => {
+    addOwnerSheetRef.current?.close();
+    setTempOwnerAddress('');
+  }, []);
+
+  const handleScanQRCode = useCallback(async () => {
+    // TODO: 实现二维码扫描功能
+    // 需要安装: expo install expo-camera expo-barcode-scanner
+    Alert.alert('提示', '二维码扫描功能需要安装 expo-camera 和 expo-barcode-scanner');
+  }, []);
+
+  const handleConfirmAddOwner = useCallback(() => {
+    if (!tempOwnerAddress) {
+      Alert.alert('错误', '请输入钱包地址');
+      return;
+    }
+
+    // 简单的地址校验
+    if (!tempOwnerAddress.startsWith('0x') || tempOwnerAddress.length !== 42) {
+      Alert.alert('错误', '无效的钱包地址');
+      return;
+    }
+
+    if (owners.some((o) => o.address.toLowerCase() === tempOwnerAddress.toLowerCase())) {
+      Alert.alert('错误', '该地址已添加');
+      return;
+    }
+
+    const newOwners = [
+      ...owners,
+      { address: tempOwnerAddress, name: `Owner ${owners.length + 1}` },
+    ];
+    setOwners(newOwners);
+    handleCloseAddOwnerModal();
+  }, [tempOwnerAddress, owners, handleCloseAddOwnerModal]);
+
+  // 保留旧的 addOwner 函数以兼容（如果还有地方在使用）
   const addOwner = () => {
     if (!newOwnerAddress) return;
 
@@ -535,6 +696,62 @@ export default function NewSafe() {
     }
   };
 
+
+  // BottomSheet snap points - 两个高度选项
+  const snapPoints = useMemo(() => ['50%', '90%'], []);
+  const addOwnerSnapPoints = useMemo(() => ['75%'], []);
+
+  // Render chain item for BottomSheetFlatList
+  const renderChainItem = useCallback(
+    ({ item: chain }: { item: (typeof chains)[number] }) => {
+      const checked = selectedChainIds.includes(chain.id);
+      const hasRpc = Boolean(chain.rpcUrls.default.http?.[0]);
+      
+      return (
+        <TouchableOpacity
+          className="flex-row items-center justify-between p-3 rounded-xl mx-4 my-1"
+          style={{
+            backgroundColor: checked
+              ? colors.primary + '20'
+              : colors.backgroundSecondary,
+            opacity: hasRpc ? 1 : 0.5,
+            borderWidth: 1,
+            borderColor: checked ? colors.primary : colors.border,
+          }}
+          onPress={() => {
+            if (!hasRpc || isCreating) return;
+            toggleChainInSelect(chain.id);
+          }}
+          disabled={!hasRpc || isCreating}
+          activeOpacity={0.7}
+        >
+          <View className="flex-row items-center gap-3 flex-1">
+            <ChainIcon chainId={chain.id} size={24} />
+            <View className="flex-1 gap-1">
+              <Text className="text-sm font-semibold" style={{ color: colors.text }}>
+                {chain.name}
+              </Text>
+              <Text className="text-xs" style={{ color: colors.textTertiary }}>
+                Chain ID: {chain.id}
+              </Text>
+            </View>
+          </View>
+          <View className="flex-row items-center">
+            {checked && (
+              <MaterialIcons name="check-circle" size={24} color={colors.primary} />
+            )}
+            {!hasRpc && (
+              <Text className="text-xs ml-2" style={{ color: colors.textTertiary }}>
+                无 RPC
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      );
+    },
+    [selectedChainIds, colors, isCreating, toggleChainInSelect]
+  );
+
   if (!isConnected) {
     return (
       <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
@@ -559,6 +776,8 @@ export default function NewSafe() {
     );
   }
 
+  
+
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }} edges={['bottom', 'left', 'right']}>
       <Stack.Screen options={{
@@ -566,288 +785,297 @@ export default function NewSafe() {
         headerTitleAlign: 'center',
         headerShadowVisible: false,
       }} />
-      {/* 进度条 */}
-      <View className="px-4 pt-2">
-        <View className="h-1 rounded-sm overflow-hidden" style={{ backgroundColor: colors.border }}>
-          <View
-            className="h-full rounded-sm"
-            style={{
-              backgroundColor: colors.primary,
-              width: `${(currentStep / 3) * 100}%`,
-            }}
-          />
-        </View>
-      </View>
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* 步骤1: 选择部署链 */}
-        {currentStep === 1 && (
-          <View className="gap-6">
-            <View className="items-center px-4 gap-4">
-              <Text className="text-sm leading-5 text-center" style={{ color: colors.textTertiary }}>
-                Safe 智能账户支持多链部署，您可以选择在一条或多条区块链上部署相同的 Safe 账户。所有链上的 Safe 账户将拥有相同的地址，方便您进行跨链资产管理。
-              </Text>
-            </View>
-
-            {/* 链列表 */}
-            <View className="gap-3">
-              {/* <Text className="text-base font-semibold" style={{ color: colors.text }}>
-                部署链 ({selectedChainIds.length})
-              </Text> */}
-              <View className="gap-2">
-                {chains.map((c) => {
-                  const checked = selectedChainIds.includes(c.id);
-                  const hasRpc = Boolean(c.rpcUrls.default.http?.[0]);
-                  return (
-                    <TouchableOpacity
-                      key={c.id}
-                      className="flex-row items-center justify-between p-3 rounded-xl"
-                      style={{
-                        backgroundColor: checked
-                          ? colors.primary + '20'
-                          : colors.backgroundSecondary,
-                        opacity: hasRpc ? 1 : 0.5,
-                      }}
-                      onPress={() => {
-                        if (!hasRpc) return;
-                        toggleChainInSelect(c.id);
-                      }}
-                      disabled={!hasRpc || isCreating}
-                      activeOpacity={0.7}
-                    >
-                      <View className="flex-row items-center gap-3 flex-1">
-                        <ChainIcon chainId={c.id} size={24} />
-                        <View className="flex-1 gap-1">
-                          <Text className="text-sm font-semibold" style={{ color: colors.text }}>
-                            {c.name}
-                          </Text>
-                          <Text className="text-xs" style={{ color: colors.textTertiary }}>
-                            Chain ID: {c.id}
-                          </Text>
+        <View className="gap-8" >
+          {/* 部署链选择 */}
+          <View className="gap-4">
+            <TouchableOpacity
+              className="flex-row items-center justify-between p-4 rounded-xl"
+              style={{
+                backgroundColor: colors.backgroundSecondary,
+              }}
+              onPress={handlePresentModalPress}
+              disabled={isCreating}
+              activeOpacity={0.7}
+            >
+              <View className="flex-row items-center gap-2">
+                {selectedChainIds.length > 0 ? (
+                  <View className="flex-row items-center" style={{ marginLeft: -8 }}>
+                    {selectedChainIds.slice(0, 3).map((chainId, index) => {
+                      const chain = chains.find((chain) => chain.id === chainId);
+                      if (!chain) return null;
+                      return (
+                        <View
+                          key={chainId}
+                          style={{
+                            marginLeft: index > 0 ? -8 : 0,
+                            zIndex: index + 1, // 后面的图标 zIndex 更高，叠在前面
+                            borderWidth: 2,
+                            borderColor: colors.backgroundSecondary,
+                            borderRadius: 12,
+                            backgroundColor: colors.backgroundSecondary,
+                          }}
+                        >
+                          <ChainIcon chainId={chain.id} size={24} />
                         </View>
+                      );
+                    })}
+                    {selectedChainIds.length > 3 && (
+                      <View
+                        style={{
+                          marginLeft: -8,
+                          width: 24,
+                          height: 24,
+                          borderRadius: 12,
+                          backgroundColor: colors.primary,
+                          borderWidth: 2,
+                          borderColor: colors.backgroundSecondary,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          zIndex: 4, // 数量徽章在最前面
+                        }}
+                      >
+                        <Text className="text-xs font-semibold" style={{ color: '#FFFFFF' }}>
+                          +{selectedChainIds.length - 3}
+                        </Text>
                       </View>
-                      <View className="flex-row items-center">
-                        {checked && (
-                          <MaterialIcons key="check-icon" name="check-circle" size={24} color={colors.primary} />
-                        )}
-                        {!hasRpc && (
-                          <Text key="no-rpc-text" className="text-xs ml-2" style={{ color: colors.textTertiary }}>
-                            无 RPC
-                          </Text>
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+                    )}
+                  </View>
+                ) : (
+                  <Text className="text-base font-medium" style={{ color: colors.text }}>
+                    选择部署链
+                  </Text>
+                )}
               </View>
-            </View>
-
-            {/* 导航按钮 */}
-            <View className="flex-row justify-between gap-3 mt-auto pt-6">
-              <Button
-                className="flex-row gap-2 flex-1"
-                color="primary"
-                onPress={() => {
-                  if (selectedChainIds.length === 0) {
-                    Alert.alert('错误', '请至少选择一条部署链');
-                    return;
-                  }
-                  setCurrentStep(2);
-                }}
-                disabled={selectedChainIds.length === 0 || isCreating}
-              >
-                <Text className="text-base font-semibold text-white">继续</Text>
-                <MaterialIcons name="arrow-forward" size={20} color="#FFFFFF" />
-              </Button>
-            </View>
+              <MaterialIcons name="arrow-forward-ios" size={20} color={colors.textTertiary} />
+            </TouchableOpacity>
           </View>
-        )}
 
-        {/* 步骤2: 配置拥有者 */}
-        {currentStep === 2 && (
-          <View className="gap-6">
-            <View className="items-center py-6 px-4 gap-4">
-              <Text className="text-sm leading-5 text-center" style={{ color: colors.textTertiary }}>
-                拥有者是 Safe 智能账户的管理者，可以发起交易和进行投票。您可以添加多个拥有者，实现多人共同管理资产。当前钱包地址已自动添加为拥有者。
+          {/* 拥有者配置 */}
+          <View className="gap-4">
+            
+            <View style={{ backgroundColor: colors.backgroundSecondary, borderRadius: 12, overflow: 'hidden' }}>
+              {owners.map((owner, index) => {
+                const avatar = ownerAvatars[owner.address];
+                const canRemove = owner.address.toLowerCase() !== address?.toLowerCase();
+                
+                return (
+                  <OwnerItem
+                    key={owner.address}
+                    owner={owner}
+                    index={index}
+                    avatar={avatar}
+                    canRemove={canRemove}
+                    address={address}
+                    colors={colors}
+                    onRemove={removeOwner}
+                  />
+                );
+              })}
+            </View>
+
+            <TouchableOpacity
+              className="flex-row items-center justify-center gap-2 p-4 rounded-xl border"
+              style={{
+                backgroundColor: colors.backgroundSecondary,
+                borderColor: colors.border,
+                borderWidth: 1,
+                borderStyle: 'dashed',
+              }}
+              onPress={handleOpenAddOwnerModal}
+              disabled={isCreating}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="add-circle-outline" size={24} color={colors.primary} />
+              <Text className="text-base font-medium" style={{ color: colors.primary }}>
+                添加拥有者
               </Text>
-            </View>
-
-            {/* 拥有者配置 */}
-            <View className="gap-3">
-              <Text className="text-base font-semibold" style={{ color: colors.text }}>
-                拥有者 ({owners.length})
-              </Text>
-              <View style={{ backgroundColor: colors.backgroundSecondary }}>
-                {owners.map((owner, index) => {
-                  const avatar = ownerAvatars[owner.address];
-                  const canRemove = owner.address.toLowerCase() !== address?.toLowerCase();
-                  
-                  return (
-                    <OwnerItem
-                      key={owner.address}
-                      owner={owner}
-                      index={index}
-                      avatar={avatar}
-                      canRemove={canRemove}
-                      address={address}
-                      colors={colors}
-                      onRemove={removeOwner}
-                    />
-                  );
-                })}
-              </View>
-
-              <View className="flex-row gap-3 items-center">
-                <TextInput
-                  className="flex-1 px-3 py-3 rounded-xl border text-sm"
-                  style={{
-                    backgroundColor: colors.backgroundSecondary,
-                    borderColor: colors.border,
-                    color: colors.text,
-                  }}
-                  placeholder="新拥有者地址"
-                  placeholderTextColor={colors.textTertiary}
-                  value={newOwnerAddress}
-                  onChangeText={setNewOwnerAddress}
-                  editable={!isCreating}
-                />
-                <TouchableOpacity
-                  className="w-12 h-12 rounded-full items-center justify-center"
-                  style={{
-                    backgroundColor: colors.primary,
-                    opacity: !newOwnerAddress || isCreating ? 0.5 : 1,
-                  }}
-                  onPress={addOwner}
-                  disabled={!newOwnerAddress || isCreating}
-                  activeOpacity={0.7}
-                >
-                  <MaterialIcons name="add" size={24} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* 导航按钮 */}
-            <View className="flex-row justify-between gap-3 mt-auto pt-6">
-              <Button
-                className="flex-1 flex-row items-center justify-center gap-2"
-                color='secondary'
-                textStyle={{ color: colors.text }}
-                onPress={() => setCurrentStep(1)}
-                disabled={isCreating}
-              >
-                <MaterialIcons name="arrow-back" size={20} color={colors.text} />
-                <Text className="text-base font-semibold" style={{ color: colors.text }}>
-                  上一步
-                </Text>
-              </Button>
-              <Button
-                className="flex-1 flex-row items-center justify-center gap-2"
-                color="primary"
-                onPress={() => {
-                  if (owners.length === 0) {
-                    Alert.alert('错误', '至少需要一位拥有者');
-                    return;
-                  }
-                  setCurrentStep(3);
-                }}
-                disabled={owners.length === 0 || isCreating}
-              >
-                <Text className="text-base font-semibold text-white">下一步</Text>
-                <MaterialIcons name="arrow-forward" size={20} color="#FFFFFF" />
-              </Button>
-            </View>
+            </TouchableOpacity>
           </View>
-        )}
 
-        {/* 步骤3: 设置阈值 */}
-        {currentStep === 3 && (
-          <View className="gap-6">
-            {/* 科普内容 */}
-            <View className="items-center py-6 px-4 gap-4">
-              <MaterialIcons name="security" size={32} color={colors.primary} />
-              <Text className="text-xl font-semibold text-center" style={{ color: colors.text }}>
-                设置确认阈值
+          {/* 确认阈值设置 */}
+          <View className="gap-4">
+            <View className="gap-2">
+              <Text className="text-lg font-semibold" style={{ color: colors.text }}>
+                确认阈值
               </Text>
-              <Text className="text-sm leading-5 text-center" style={{ color: colors.textTertiary }}>
+              <Text className="text-sm leading-5" style={{ color: colors.textTertiary }}>
                 确认阈值决定了执行交易需要多少位拥有者签名。例如，如果设置为 2/3，则至少需要 2 位拥有者同意才能执行交易。这提供了额外的安全保障，防止单点故障。
               </Text>
             </View>
-
-            {/* 阈值选择器 */}
-            <View className="gap-3">
-              <Text className="text-base font-semibold" style={{ color: colors.text }}>
-                确认阈值
-              </Text>
-              <View className="flex-row flex-wrap gap-3">
-                {Array.from({ length: owners.length }).map((_, i) => {
-                  const value = String(i + 1);
-                  const isSelected = threshold === value;
-                  return (
-                    <TouchableOpacity
-                      key={i + 1}
-                      className="px-4 py-2.5 rounded-lg border"
+            <View className="flex-row flex-wrap gap-3">
+              {Array.from({ length: owners.length }).map((_, i) => {
+                const value = String(i + 1);
+                const isSelected = threshold === value;
+                return (
+                  <TouchableOpacity
+                    key={i + 1}
+                    className="px-4 py-2.5 rounded-lg border"
+                    style={{
+                      backgroundColor: isSelected
+                        ? colors.primary
+                        : colors.backgroundSecondary,
+                      borderColor: isSelected ? colors.primary : colors.border,
+                    }}
+                    onPress={() => setThreshold(value)}
+                    disabled={isCreating}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      className="text-sm font-medium"
                       style={{
-                        backgroundColor: isSelected
-                          ? colors.primary
-                          : colors.backgroundSecondary,
-                        borderColor: isSelected ? colors.primary : colors.border,
+                        color: isSelected ? '#FFFFFF' : colors.text,
                       }}
-                      onPress={() => setThreshold(value)}
-                      disabled={isCreating}
-                      activeOpacity={0.7}
                     >
-                      <Text
-                        className="text-sm font-medium"
-                        style={{
-                          color: isSelected ? '#FFFFFF' : colors.text,
-                        }}
-                      >
-                        {i + 1} / {owners.length} 人
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* 导航和确认按钮 */}
-            <View className="flex-row justify-between gap-3 mt-auto pt-6">
-              <Button
-                className="flex-1 flex-row items-center justify-center gap-2"
-                style={{
-                  backgroundColor: colors.backgroundSecondary,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}
-                textStyle={{ color: colors.text }}
-                onPress={() => setCurrentStep(2)}
-                disabled={isCreating}
-              >
-                <MaterialIcons name="arrow-back" size={20} color={colors.text} />
-                <Text className="text-base font-semibold" style={{ color: colors.text }}>
-                  上一步
-                </Text>
-              </Button>
-              <Button
-                className="flex-1 flex-row items-center justify-center gap-2"
-                color="primary"
-                onPress={handleCreateSafe}
-                disabled={isCreating}
-              >
-                {isCreating && <ActivityIndicator size="small" color="#FFFFFF" />}
-                <Text className="text-base font-semibold text-white">
-                  {isCreating ? '创建中...' : '确认创建'}
-                </Text>
-              </Button>
+                      {i + 1} / {owners.length} 人
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
-        )}
+
+          {/* 确认创建按钮 */}
+          <View className="pt-4">
+            <Button
+              className="w-full flex-row items-center justify-center gap-2"
+              color="primary"
+              onPress={handleCreateSafe}
+              disabled={isCreating || selectedChainIds.length === 0 || owners.length === 0}
+            >
+              {isCreating && <ActivityIndicator size="small" color="#FFFFFF" />}
+              <Text className="text-base font-semibold text-white">
+                {isCreating ? '创建中...' : '确认创建'}
+              </Text>
+            </Button>
+          </View>
+        </View>
       </ScrollView>
 
+      {/* 链选择 BottomSheet */}
+      <BottomSheet
+        ref={bottomSheetRef}
+        index={-1}
+        snapPoints={snapPoints}
+        enableDynamicSizing={false}
+        onChange={handleSheetChange}
+        enablePanDownToClose={true}
+        backdropComponent={renderBackdrop}
+      >
+        <BottomSheetFlatList
+          data={chains}
+          keyExtractor={(chain: (typeof chains)[number]) => String(chain.id)}
+          renderItem={renderChainItem}
+          ListHeaderComponent={
+            <View style={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: 16 }}>
+              <Text className="text-lg font-semibold mb-2" style={{ color: colors.text }}>
+                选择部署链 ({selectedChainIds.length})
+              </Text>
+              <Text className="text-sm leading-5" style={{ color: colors.textTertiary }}>
+                Safe 智能账户支持多链部署，您可以选择在一条或多条区块链上部署相同的 Safe 账户。所有链上的 Safe 账户将拥有相同的地址，方便您进行跨链资产管理。
+              </Text>
+            </View>
+          }
+          contentContainerStyle={{
+            paddingBottom: 20,
+          }}
+        />
+      </BottomSheet>
+
+      {/* 添加拥有者 BottomSheet */}
+      <BottomSheet
+        ref={addOwnerSheetRef}
+        index={-1}
+        snapPoints={addOwnerSnapPoints}
+        enableDynamicSizing={true}
+        enablePanDownToClose={true}
+        backdropComponent={renderBackdrop}
+        keyboardBehavior="interactive"
+        keyboardBlurBehavior="restore"
+        android_keyboardInputMode="adjustResize"
+        enableHandlePanningGesture={true}
+        animateOnMount={true}
+      >
+        <BottomSheetView style={{ flex: 1 }}>
+          <BottomSheetScrollView
+            contentContainerStyle={{ 
+              paddingHorizontal: 16, 
+              paddingTop: 24, 
+              paddingBottom: keyboardHeight > 0 ? keyboardHeight + 20 : 20 // 根据键盘高度动态调整 padding
+            }}
+            keyboardShouldPersistTaps="handled"
+            bounces={false}
+            showsVerticalScrollIndicator={true}
+            nestedScrollEnabled={true}
+          >
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-lg font-semibold" style={{ color: colors.text }}>
+                添加拥有者
+              </Text>
+              <TouchableOpacity onPress={handleCloseAddOwnerModal}>
+                <MaterialIcons name="close" size={24} color={colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
+
+            <View className="gap-4">
+              <View className="gap-2">
+                <Text className="text-sm font-medium" style={{ color: colors.text }}>
+                  钱包地址
+                </Text>
+                <View className="flex-row gap-2 items-center">
+                  <BottomSheetTextInput
+                    className="flex-1 px-4 py-3 rounded-xl border text-sm font-mono"
+                    style={{
+                      backgroundColor: colors.backgroundSecondary,
+                      borderColor: colors.border,
+                      borderWidth: 1,
+                      color: colors.text,
+                    }}
+                    placeholder="0x..."
+                    placeholderTextColor={colors.textTertiary}
+                    value={tempOwnerAddress}
+                    onChangeText={setTempOwnerAddress}
+                    editable={!isCreating}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    blurOnSubmit={true}
+                  />
+                  <TouchableOpacity
+                    className="w-12 h-12 rounded-xl items-center justify-center"
+                    style={{
+                      backgroundColor: colors.primary,
+                    }}
+                    onPress={handleScanQRCode}
+                    disabled={isCreating}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialIcons name="qr-code-scanner" size={24} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View className="pt-4 pb-4">
+                <Button
+                  className="w-full"
+                  color="primary"
+                  onPress={handleConfirmAddOwner}
+                  disabled={!tempOwnerAddress || isCreating}
+                >
+                  <Text className="text-base font-semibold text-white">
+                    确认添加
+                  </Text>
+                </Button>
+              </View>
+            </View>
+          </BottomSheetScrollView>
+        </BottomSheetView>
+      </BottomSheet>
     </SafeAreaView>
   );
 }

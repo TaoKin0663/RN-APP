@@ -3,7 +3,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { useRouter } from "expo-router";
 import { useTheme } from "@/hooks/use-theme";
 import { Colors } from "@/config/theme";
-import { useAccount } from "wagmi";
+import { useAccount, useSwitchChain, useChainId } from "wagmi";
 import { useAvatarGenerator } from "@/hooks/useAvatarGenerator";
 import Jazzicon from "react-native-jazzicon";
 import { formatAddress } from "@/utils/common";
@@ -18,9 +18,20 @@ import { api } from "@/services/api/api";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { Button } from "@/components/Button";
-import type { ISafeInfo } from "@/services/api/types";
+import type { ISafeInfo, IToken } from "@/services/api/types";
 import { useAppStore } from "@/store";
-
+import { NetworkSelector, type Network } from "@/components/NetworkSelector";
+import { TokenIcon } from "@/components/TokenIcon";
+import { formatUnits, type Address } from "viem";
+import { ScrollView } from "react-native";
+import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { tokenABI } from "@/utils/ABI/token";
+enum TokenType {
+  REGULAR_BENEFITS = "REGULAR_BENEFITS",
+  STAKE = "STAKE",
+  EQUITY = "EQUITY",
+}
 // 骨架屏项组件
 function SkeletonItem({ colors }: { colors: typeof Colors.dark }) {
   const shimmerAnim = useRef(new Animated.Value(0)).current;
@@ -112,11 +123,292 @@ function SkeletonList({ colors }: { colors: typeof Colors.dark }) {
   );
 }
 
+// 代币列表项组件
+function TokenListItem({
+  token,
+  colors,
+  userAddress,
+  chainId
+}: {
+  token: IToken;
+  colors: typeof Colors.dark;
+  userAddress?: string;
+  chainId?: number;
+}) {
+  // 解析 token 的 chainId（可能是十六进制字符串或数字字符串）
+  const tokenChainId = useMemo(() => {
+    if (!token.chain?.chain_id) return null;
+    const chainIdStr = token.chain.chain_id;
+    // 如果是十六进制格式（0x开头），转换为数字
+    if (chainIdStr.startsWith('0x') || chainIdStr.startsWith('0X')) {
+      return parseInt(chainIdStr, 16);
+    }
+    // 否则直接解析为数字
+    return parseInt(chainIdStr, 10);
+  }, [token.chain?.chain_id]);
+
+  // 检查 token 是否在当前链上
+  const isTokenOnCurrentChain = useMemo(() => {
+    return chainId !== undefined && tokenChainId !== null && chainId === tokenChainId;
+  }, [chainId, tokenChainId]);
+
+  // 获取代币余额
+  const { data: balance, isLoading: isLoadingBalance } = useReadContract({
+    address: token.address as Address,
+    abi: tokenABI,
+    functionName: 'balanceOf',
+    args: userAddress ? [userAddress as Address] : undefined,
+    query: {
+      enabled: !!token.address && !!userAddress && isTokenOnCurrentChain,
+    },
+    chainId: chainId,
+  });
+
+  // 获取待领取分红（仅对 REGULAR_BENEFITS 类型）
+  const isRegularBenefits = token.type === TokenType.REGULAR_BENEFITS;
+  const { 
+    data: pendingDividends, 
+    isLoading: isLoadingDividends,
+    refetch: refetchPendingDividends 
+  } = useReadContract({
+    address: token.address as Address,
+    abi: tokenABI,
+    functionName: 'getPendingDividends',
+    args: userAddress ? [userAddress as Address] : undefined,
+    query: {
+      enabled: isRegularBenefits && !!token.address && !!userAddress && isTokenOnCurrentChain,
+    },
+    chainId: chainId,
+  });
+
+  // 领取分红
+  const {
+    writeContract: writeClaimDividends,
+    isPending: isClaiming,
+    data: claimTxHash,
+    error: claimError,
+  } = useWriteContract();
+
+  // 等待交易确认
+  const { data: claimReceipt, isLoading: isWaitingClaim } = useWaitForTransactionReceipt({
+    hash: claimTxHash,
+    query: {
+      enabled: !!claimTxHash,
+      retry: 3,
+      retryDelay: 2000,
+    },
+  });
+
+  // 交易确认成功后刷新待领取分红数据
+  useEffect(() => {
+    if (claimReceipt && claimReceipt.status === 'success') {
+      refetchPendingDividends();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else if (claimReceipt && claimReceipt.status === 'reverted') {
+      Alert.alert('错误', '领取分红交易失败');
+    }
+  }, [claimReceipt, refetchPendingDividends]);
+
+  // 处理交易错误
+  useEffect(() => {
+    if (claimError) {
+      console.error('领取分红错误:', claimError);
+      Alert.alert('错误', claimError.message || '领取分红失败，请稍后重试');
+    }
+  }, [claimError]);
+
+  // 检查是否可以领取分红
+  const canClaimDividends = useMemo(() => {
+    if (!isRegularBenefits) return false;
+    if (!isTokenOnCurrentChain) return false;
+    if (!userAddress || !token.address) return false;
+    if (isClaiming || isWaitingClaim) return false;
+    // 检查待领取分红是否大于0
+    if (!pendingDividends || pendingDividends === 0n) return false;
+    return true;
+  }, [isRegularBenefits, isTokenOnCurrentChain, userAddress, token.address, isClaiming, isWaitingClaim, pendingDividends]);
+
+  // 处理领取分红
+  const handleClaimDividends = useCallback(() => {
+    if (!canClaimDividends || !userAddress || !token.address) return;
+    
+    try {
+      writeClaimDividends({
+        address: token.address as Address,
+        abi: tokenABI,
+        functionName: 'claimDividends',
+        args: [userAddress as Address],
+      });
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      console.error('领取分红失败:', error);
+      Alert.alert('错误', '领取分红失败，请稍后重试');
+    }
+  }, [canClaimDividends, userAddress, token.address, writeClaimDividends]);
+
+  // 格式化余额显示
+  const formatBalance = () => {
+    // 如果 token 不在当前链上，显示提示
+    if (!isTokenOnCurrentChain) {
+      return "请切换到对应链";
+    }
+
+    if (isLoadingBalance) {
+      return "加载中...";
+    }
+
+    if (!balance) {
+      return "0";
+    }
+
+    try {
+      const formatted = formatUnits(balance as bigint, token.decimals);
+      const num = parseFloat(formatted);
+
+      // 如果余额为0，直接返回0
+      if (num === 0) {
+        return "0";
+      }
+
+      // 如果余额很小（小于0.000001），使用科学计数法显示
+      if (num > 0 && num < 0.000001) {
+        return num.toExponential(2);
+      }
+
+      // 如果是整数，直接返回整数部分
+      if (num % 1 === 0) {
+        return num.toString();
+      }
+
+      // 否则保留最多6位小数，但移除末尾的0
+      return num.toFixed(6).replace(/\.?0+$/, '');
+    } catch (error) {
+      console.error('格式化余额失败:', error);
+      return "0";
+    }
+  };
+
+  // 格式化待领取分红显示
+  const formatPendingDividends = () => {
+    // 如果不是 REGULAR_BENEFITS 类型，显示 ---
+    if (!isRegularBenefits) {
+      return "---";
+    }
+
+    // 如果 token 不在当前链上，显示提示
+    if (!isTokenOnCurrentChain) {
+      return "请切换到对应链";
+    }
+
+    if (isLoadingDividends) {
+      return "加载中...";
+    }
+
+    if (!pendingDividends) {
+      return "0";
+    }
+
+    try {
+      const formatted = formatUnits(pendingDividends as bigint, token.decimals);
+      const num = parseFloat(formatted);
+
+      // 如果分红为0，直接返回0
+      if (num === 0) {
+        return "0";
+      }
+
+      // 如果分红很小（小于0.000001），使用科学计数法显示
+      if (num > 0 && num < 0.000001) {
+        return num.toExponential(2);
+      }
+
+      // 如果是整数，直接返回整数部分
+      if (num % 1 === 0) {
+        return num.toString();
+      }
+
+      // 否则保留最多6位小数，但移除末尾的0
+      return num.toFixed(6).replace(/\.?0+$/, '');
+    } catch (error) {
+      console.error('格式化待领取分红失败:', error);
+      return "0";
+    }
+  };
+
+  return (
+    <View
+      className="mb-4 p-4 rounded-xl"
+      style={{ backgroundColor: colors.backgroundSecondary }}
+    >
+      {/* 顶部：代币图标、名称和分享图标 */}
+      <View className="flex-row items-center justify-between mb-4">
+        <View className="flex-row items-center flex-1">
+          <TokenIcon symbol={token.symbol} chainId={token.chain?.chain_id} size={40} />
+          <Text className="text-base font-semibold ml-2.5" style={{ color: colors.text }}>
+            {token.symbol}
+          </Text>
+        </View>
+      </View>
+
+      {/* 交易详情 */}
+      <View className="mb-4">
+        <View className="flex-row items-center justify-between mb-2.5">
+          <Text className="text-sm" style={{ color: colors.textSecondary }}>余额</Text>
+          <Text className="text-sm" style={{ color: colors.text }}>{formatBalance()}</Text>
+        </View>
+        <View className="flex-row items-center justify-between">
+          <Text className="text-sm" style={{ color: colors.textSecondary }}>待领取分红</Text>
+          <Text className="text-sm" style={{ color: '#FF4444' }}>{formatPendingDividends()}</Text>
+        </View>
+      </View>
+
+      {/* 操作按钮 */}
+      {isRegularBenefits && (
+        <View className="flex-row gap-2 justify-end">
+          <Button
+            className="py-2.5 px-3 rounded-lg items-center border-[0px] w-[auto] min-h-[0px] min-w-[0px]"
+            style={{
+              backgroundColor: canClaimDividends 
+                ? (colors.backgroundTertiary || colors.background)
+                : (colors.backgroundTertiary || colors.background),
+              opacity: canClaimDividends ? 1 : 0.5,
+            }}
+            onPress={handleClaimDividends}
+            disabled={!canClaimDividends}
+          >
+            <Text 
+              className="text-sm font-medium" 
+              style={{ 
+                color: canClaimDividends ? colors.textSecondary : colors.textTertiary 
+              }}
+            >
+              {isClaiming || isWaitingClaim ? '领取中...' : '领取分红'}
+            </Text>
+          </Button>
+        </View>
+      )}
+    </View>
+  );
+}
+
+// 默认网络列表
+const defaultNetworks: Network[] = [
+  { id: 1, name: 'Ethereum', chainId: 1 },
+  { id: 2, name: 'Optimism', chainId: 10 },
+  { id: 3, name: 'BSC', chainId: 56 },
+  { id: 4, name: 'Polygon', chainId: 137 },
+  { id: 5, name: 'Base', chainId: 8453 },
+  { id: 6, name: 'Arbitrum', chainId: 42161 },
+  { id: 7, name: 'Sepolia', chainId: 11155111 },
+];
+
 export default function Wallet() {
   const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const { address, chainId } = useAccount();
+  const currentChainId = useChainId();
+  const { switchChainAsync } = useSwitchChain();
   const { generateAvatar } = useAvatarGenerator();
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
   const [safes, setSafes] = useState<string[]>([]);
@@ -125,6 +417,11 @@ export default function Wallet() {
   const insets = useSafeAreaInsets();
   // 跟踪正在加载的 Safe 地址，防止重复请求
   const loadingSafeAddresses = useRef<Set<string>>(new Set());
+  // 代币列表相关状态
+  const [tokens, setTokens] = useState<IToken[]>([]);
+  const [loadingTokens, setLoadingTokens] = useState(false);
+  // 获取 tabbar 高度，用于设置底部内边距
+  const tabBarHeight = useBottomTabOverflow();
 
   // 从 store 获取当前选中的账户地址
   const selectedAccountAddress = useAppStore((state) => state.selectedAccountAddress);
@@ -137,6 +434,31 @@ export default function Wallet() {
     if (!displayAddress) return null;
     return generateAvatar(displayAddress);
   }, [displayAddress, generateAvatar]);
+
+  // 根据 chainId 获取当前选中的网络
+  const selectedNetwork = useMemo(() => {
+    const chainIdToUse = currentChainId || chainId;
+    if (!chainIdToUse) {
+      return defaultNetworks[6]; // 默认 Sepolia
+    }
+    return defaultNetworks.find(n => n.chainId === chainIdToUse) || defaultNetworks[6];
+  }, [currentChainId, chainId]);
+
+  // 切换网络的处理函数
+  const handleSelectNetwork = useCallback(async (network: Network) => {
+    if (!switchChainAsync) {
+      Alert.alert('错误', '无法切换网络，请确保钱包已连接');
+      return;
+    }
+
+    try {
+      await switchChainAsync({ chainId: network.chainId as number });
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      console.error('切换网络失败:', error);
+      Alert.alert('切换失败', (error as Error)?.message || '请稍后重试');
+    }
+  }, [switchChainAsync]);
 
   const allAddresses = useMemo(() => {
     const addresses: string[] = [];
@@ -270,6 +592,26 @@ export default function Wallet() {
     });
   }, [router, handleCloseModal]);
 
+  // 获取代币列表
+  const fetchTokenList = useCallback(async () => {
+    try {
+      setLoadingTokens(true);
+      const response = await api.token.getTokenList();
+      if (response.success && response.data) {
+        setTokens(response.data.tokens || []);
+      }
+    } catch (error) {
+      console.error('获取代币列表失败:', error);
+    } finally {
+      setLoadingTokens(false);
+    }
+  }, []);
+
+  // 组件挂载时获取代币列表
+  useEffect(() => {
+    fetchTokenList();
+  }, [fetchTokenList]);
+
   const test = () => {
     router.push({
       pathname: '/transaction-progress',
@@ -279,22 +621,59 @@ export default function Wallet() {
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
-      {/* 左上角显示钱包地址和头像 */}
-      {displayAddress && (
-        <TouchableOpacity
-          onPress={handlePresentModalPress}
-          activeOpacity={0.7}
-          className="flex-row items-center px-5 pt-2.5 pb-5"
-        >
-          {avatarSeed !== null && (
-            <Jazzicon size={32} seed={avatarSeed} />
-          )}
-          <Text className="text-sm font-medium ml-2.5" style={{ color: colors.text }}>
-            {formatAddress(displayAddress)}
-          </Text>
-          <MaterialIcons name="arrow-drop-down" size={20} color={colors.text} />
-        </TouchableOpacity>
-      )}
+      {/* 顶部栏：左上角显示钱包地址和头像，右上角显示网络选择器 */}
+      <View className="flex-row items-center justify-between px-5 pt-2.5 pb-5">
+        {/* 左上角：钱包地址和头像 */}
+        {displayAddress && (
+          <TouchableOpacity
+            onPress={handlePresentModalPress}
+            activeOpacity={0.7}
+            className="flex-row items-center flex-1"
+          >
+            {avatarSeed !== null && (
+              <Jazzicon size={32} seed={avatarSeed} />
+            )}
+            <Text className="text-sm font-medium ml-2.5" style={{ color: colors.text }}>
+              {formatAddress(displayAddress)}
+            </Text>
+            <MaterialIcons name="arrow-drop-down" size={20} color={colors.text} />
+          </TouchableOpacity>
+        )}
+
+        {/* 右上角：网络选择器 */}
+        <NetworkSelector
+          selectedNetwork={selectedNetwork}
+          onSelectNetwork={handleSelectNetwork}
+          networks={defaultNetworks}
+        />
+      </View>
+
+      {/* 代币列表 */}
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: tabBarHeight + 20 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {loadingTokens ? (
+          <View className="items-center justify-center py-10">
+            <Text className="text-sm" style={{ color: colors.textSecondary }}>加载中...</Text>
+          </View>
+        ) : tokens.length === 0 ? (
+          <View className="items-center justify-center py-10">
+            <Text className="text-sm" style={{ color: colors.textSecondary }}>暂无代币</Text>
+          </View>
+        ) : (
+          tokens.map((token) => (
+            <TokenListItem
+              key={token.id}
+              token={token}
+              colors={colors}
+              userAddress={displayAddress}
+              chainId={currentChainId || chainId}
+            />
+          ))
+        )}
+      </ScrollView>
 
       {/* 钱包信息底部弹出层 */}
       <BottomSheetModal
@@ -447,39 +826,6 @@ export default function Wallet() {
           </View>
         </View>
       </BottomSheetModal>
-
-      {/* <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-        <Text style={{ color: colors.text, fontSize: 24, marginBottom: 30 }}>Wallet</Text>
-        <TouchableOpacity
-          onPress={handleNavigateToNewSafe}
-          style={{
-            backgroundColor: colors.primary,
-            paddingHorizontal: 30,
-            paddingVertical: 15,
-            borderRadius: 10,
-          }}
-          activeOpacity={0.7}
-        >
-          <Text style={{ color: colors.background, fontSize: 16, fontWeight: '600' }}>
-            创建新 Safe
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={test}
-          style={{
-            backgroundColor: colors.primary,
-            paddingHorizontal: 30,
-            paddingVertical: 15,
-            borderRadius: 10,
-          }}
-          activeOpacity={0.7}
-        >
-          <Text style={{ color: colors.background, fontSize: 16, fontWeight: '600' }}>
-            Test
-          </Text>
-        </TouchableOpacity>
-      </View> */}
     </SafeAreaView>
   );
 }

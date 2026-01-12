@@ -166,67 +166,43 @@ export function Button({
     fontWeight: '500',
   };
 
-  // 递归处理 children，为所有 Text 元素应用默认样式
-  const applyTextStyle = (node: React.ReactNode): React.ReactNode => {
-    if (typeof node === 'string') {
-      return <Text style={[defaultTextStyle, textStyle]}>{node}</Text>;
-    }
-    
-    if (React.isValidElement(node)) {
-      const element = node as React.ReactElement<any>;
-      // 如果是 Text 组件，应用样式
-      if (element.type === Text) {
-        return React.cloneElement(element, {
-          style: [defaultTextStyle, textStyle, element.props?.style],
-        });
-      }
-      
-      // 如果有 children，递归处理
-      if (element.props && element.props.children) {
-        const processedChildren = React.Children.map(element.props.children, applyTextStyle);
-        return React.cloneElement(element, {
-          children: processedChildren,
-        });
-      }
-    }
-    
-    // 如果是数组，递归处理每个元素
-    if (Array.isArray(node)) {
-      return node.map(applyTextStyle);
-    }
-    
-    return node;
-  };
-
-  // 自动处理字符串子元素，渲染为 Text
+  // 渲染内容：如果是字符串就用 Text 包裹并应用默认样式，如果是 ReactNode 就直接渲染
   const renderContent = () => {
-    return applyTextStyle(children);
+    // 如果是字符串，用 Text 包裹并应用默认样式
+    if (typeof children === 'string') {
+      return <Text style={[defaultTextStyle, textStyle]}>{children}</Text>;
+    }
+    
+    // 如果是 ReactNode，直接渲染，不进行任何处理
+    return children;
   };
 
-  // 默认样式：风格（圆角、内边距、背景色等）
-  const minHeight = 40; // 适中的高度
-  const minWidth = 120;
-  const defaultStyle: ViewStyle = {
-    backgroundColor,
-    borderRadius: 100,
-    paddingVertical: 0,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'flex-start', // 宽度由内容撑开
-    minHeight, // 适中的高度
-    minWidth, // 适中的宽度
-    ...(variant === 'outline' && {
-      borderWidth: 1.5,
-      borderColor: borderColor,
-    }),
+  // 构建默认的 className
+  const defaultClassName = [
+    'items-center justify-center',
+    'rounded-full',
+    'px-3',
+    'min-h-[40px] min-w-[120px]',
+    variant === 'outline' ? 'border-[1.5px]' : '',
+  ].filter(Boolean).join(' ');
+  
+  const mergedClassName = className 
+    ? `${defaultClassName} ${className}` 
+    : defaultClassName;
+
+  // 只保留需要动态设置的样式（主题色相关）
+  const dynamicStyle: ViewStyle = {
+    ...(variant === 'outline' 
+      ? { borderColor: borderColor }
+      : { backgroundColor }
+    ),
   };
 
   return (
     <AnimatedTouchableOpacity
       {...props}
-      className={className}
-      style={[defaultStyle, style, animatedStyle]}
+      className={mergedClassName}
+      style={[dynamicStyle, style, animatedStyle]}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       activeOpacity={1}

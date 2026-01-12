@@ -5,7 +5,6 @@ import React, { useEffect } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import { useAccount } from 'wagmi';
 
-import { MobileWave } from '@/components/MobileWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import ReownFigures from '@/components/ReownFigures';
 import { ThemedText } from '@/components/ThemedText';
@@ -43,7 +42,6 @@ export default function HomeScreen() {
         <ThemedView style={styles.titleContainer}>
           <ThemedText type="title">AppKit</ThemedText>
           <ThemedText type="subtitle">for React Native</ThemedText>
-          <MobileWave />
         </ThemedView>
         <WalletInfoView />
         

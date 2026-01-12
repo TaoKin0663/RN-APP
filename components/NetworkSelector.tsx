@@ -167,7 +167,9 @@ export function NetworkSelector({
         enableDynamicSizing={false}
         enablePanDownToClose={true}
         enableDismissOnClose={true}
-        enableOverDrag={false}
+        // 允许超过 snapPoints 的“拉伸/回弹”，配合阻尼提高手感
+        enableOverDrag={true}
+        overDragResistanceFactor={3}
         enableContentPanningGesture={true}
         backdropComponent={renderBackdrop}
         backgroundStyle={{ backgroundColor: colors.backgroundSecondary }}
@@ -177,6 +179,9 @@ export function NetworkSelector({
       >
         <BottomSheetScrollView
           showsVerticalScrollIndicator={false}
+          bounces={true}
+          alwaysBounceVertical={true}  // 即使内容不满一屏也允许回弹手势传递
+          overScrollMode="always"      // 允许 Android 上的越界
           contentContainerStyle={{
             paddingHorizontal: 16,
             paddingTop: 8,
