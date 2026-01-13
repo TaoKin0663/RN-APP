@@ -17,7 +17,8 @@ import { ModalContent } from '@/components/ui/ModalContent';
 import { useAppStore } from '@/store';
 import { startKYCVerificationWithAlert } from '@/utils/kycVerification';
 import { useRegularBenefitsTrade } from '@/hooks/trade/useRegularBenefitsTrade';
-import { useAccount, useChainId } from 'wagmi';
+import { useStakeTrade } from '@/hooks/trade/useStakeTrade';
+import { useAppKit, useAccount } from '@reown/appkit-react-native';
 
 enum TokenType {
     REGULAR_BENEFITS = "REGULAR_BENEFITS",
@@ -45,11 +46,10 @@ export default function TokenDetailScreen() {
     const colors = Colors[colorScheme ?? 'dark'];
     const router = useRouter();
     const { tokenAddress } = useLocalSearchParams<{ tokenAddress: string }>();
-    const selectedAccountAddress = useAppStore(state => state.selectedAccountAddress);
-    const { address: accountAddress, isConnected } = useAccount();
-    const chainId = useChainId();
-    // 使用选中的账户地址，如果没有则使用连接的钱包地址
-    const effectiveAccountAddress = selectedAccountAddress || accountAddress;
+    const selectedSafeAddress = useAppStore(state => state.selectedSafeAddress);
+    const { address: accountAddress, isConnected, chainId } = useAccount();
+    // 使用选中的 Safe 地址，如果没有则使用连接的钱包地址
+    const effectiveAccountAddress = selectedSafeAddress || accountAddress;
     const [token, setToken] = useState<IToken | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -158,6 +158,7 @@ export default function TokenDetailScreen() {
     }, [token, investmentAmount]);
 
     const isRegularBenefits = token?.type === TokenType.REGULAR_BENEFITS;
+    const isStake = token?.type === TokenType.STAKE;
 
     const regularBenefitsTrade = useRegularBenefitsTrade({
         enabled: isRegularBenefits,
@@ -168,71 +169,135 @@ export default function TokenDetailScreen() {
         isConnected,
     });
 
-    // 处理 approve 错误（仅 REGULAR_BENEFITS）
+    const stakeTrade = useStakeTrade({
+        enabled: isStake,
+        token,
+        tokenAddress: tokenAddress ?? undefined,
+        tokenAmount: calculateTokenAmount,
+        accountAddress: effectiveAccountAddress ?? undefined,
+        isConnected,
+    });
+
+    // 处理 approve 错误（REGULAR_BENEFITS 和 STAKE）
     useEffect(() => {
-        if (!isRegularBenefits) return;
-        if (regularBenefitsTrade.approveError) {
+        if (isRegularBenefits && regularBenefitsTrade.approveError) {
             console.error('Approve 交易失败:', regularBenefitsTrade.approveError);
-            Alert.alert('授权失败', regularBenefitsTrade.approveError.message || 'USDT 授权失败，请重试');
+            show(<ModalContent
+                title="提示"
+                message={'授权失败，请重试'}
+                buttons={
+                    <Button color="primary" onPress={hide}>
+                        我知道了
+                    </Button>
+                }
+            />)
         }
-    }, [isRegularBenefits, regularBenefitsTrade.approveError]);
+        if (isStake && stakeTrade.approveError) {
+            console.error('Approve 交易失败:', stakeTrade.approveError);
+            show(<ModalContent
+                title="提示"
+                message={'授权失败，请重试'}
+                buttons={
+                    <Button color="primary" onPress={hide}>
+                        我知道了
+                    </Button>
+                }
+            />)
+        }
+    }, [isRegularBenefits, isStake, regularBenefitsTrade.approveError, stakeTrade.approveError]);
 
-    // 处理购买错误（仅 REGULAR_BENEFITS）
+    // 处理购买/质押错误（REGULAR_BENEFITS 和 STAKE）
     useEffect(() => {
-        if (!isRegularBenefits) return;
-        if (regularBenefitsTrade.purchaseError) {
+        if (isRegularBenefits && regularBenefitsTrade.purchaseError) {
             console.error('购买交易失败:', regularBenefitsTrade.purchaseError);
-            Alert.alert('交易失败', regularBenefitsTrade.purchaseError.message || '购买失败，请重试');
+            show(<ModalContent
+                title="提示"
+                message={'交易失败，请重试'}
+                buttons={
+                    <Button color="primary" onPress={hide}>
+                        我知道了
+                    </Button>
+                }
+            />)
         }
-    }, [isRegularBenefits, regularBenefitsTrade.purchaseError]);
+        if (isStake && stakeTrade.stakeError) {
+            console.error('质押交易失败:', stakeTrade.stakeError);
+            show(<ModalContent
+                title="提示"
+                message={'交易失败，请重试'}
+                buttons={
+                    <Button color="primary" onPress={hide}>
+                        我知道了
+                    </Button>
+                }
+            />)
+        }
+    }, [isRegularBenefits, isStake, regularBenefitsTrade.purchaseError, stakeTrade.stakeError]);
 
-    // 购买交易发送成功后，跳转到交易进度页面（仅 REGULAR_BENEFITS）
+    // 购买/质押交易发送成功后，跳转到交易进度页面（REGULAR_BENEFITS 和 STAKE）
     useEffect(() => {
-        if (!isRegularBenefits) return;
-        if (regularBenefitsTrade.purchaseTxHash) {
+        if (isRegularBenefits && regularBenefitsTrade.purchaseTxHash) {
             bottomSheetRef.current?.close();
             router.push({
                 pathname: '/transaction-progress',
                 params: { hash: regularBenefitsTrade.purchaseTxHash },
             });
         }
-    }, [isRegularBenefits, regularBenefitsTrade.purchaseTxHash, router]);
-
-    const needsApprove = isRegularBenefits ? regularBenefitsTrade.needsApprove : null;
-    const shouldEstimateGas = isRegularBenefits ? regularBenefitsTrade.shouldEstimateGas : false;
-    const gasEstimateError = isRegularBenefits ? regularBenefitsTrade.gasEstimateError : null;
-    const isEstimatingGas = isRegularBenefits ? regularBenefitsTrade.isEstimatingGas : false;
-    const isLoadingGasPrice = isRegularBenefits ? regularBenefitsTrade.isLoadingGasPrice : false;
-    const gasFeeInNative = isRegularBenefits ? regularBenefitsTrade.gasFeeInNative : null;
-    const isApproving = isRegularBenefits ? regularBenefitsTrade.isApproving : false;
-    const isWaitingApprove = isRegularBenefits ? regularBenefitsTrade.isWaitingApprove : false;
-    const isPurchasing = isRegularBenefits ? regularBenefitsTrade.isPurchasing : false;
-
-    // 获取原生代币符号
-    const nativeCurrencySymbol = useMemo(() => {
-        if (token?.chain?.native_currency_symbol) {
-            return token.chain.native_currency_symbol;
+        if (isStake && stakeTrade.stakeTxHash) {
+            bottomSheetRef.current?.close();
+            router.push({
+                pathname: '/transaction-progress',
+                params: { hash: stakeTrade.stakeTxHash },
+            });
         }
-        // 根据 chainId 返回默认符号
-        const chainIdNum = chainId || (token?.chain?.chain_id ? parseInt(token.chain.chain_id, 10) : null);
-        if (chainIdNum === 1 || chainIdNum === 11155111) return 'ETH'; // Ethereum/Sepolia
-        if (chainIdNum === 137) return 'MATIC'; // Polygon
-        if (chainIdNum === 56) return 'BNB'; // BSC
-        if (chainIdNum === 10) return 'ETH'; // Optimism
-        if (chainIdNum === 8453) return 'ETH'; // Base
-        if (chainIdNum === 42161) return 'ETH'; // Arbitrum
-        return 'ETH'; // 默认
-    }, [token?.chain, chainId]);
+    }, [isRegularBenefits, isStake, regularBenefitsTrade.purchaseTxHash, stakeTrade.stakeTxHash, router]);
+
+    const needsApprove = isRegularBenefits ? regularBenefitsTrade.needsApprove : (isStake ? stakeTrade.needsApprove : null);
+    const isApproving = isRegularBenefits ? regularBenefitsTrade.isApproving : (isStake ? stakeTrade.isApproving : false);
+    const isWaitingApprove = isRegularBenefits ? regularBenefitsTrade.isWaitingApprove : (isStake ? stakeTrade.isWaitingApprove : false);
+    const isPurchasing = isRegularBenefits ? regularBenefitsTrade.isPurchasing : (isStake ? stakeTrade.isStaking : false);
+    const isLoadingAllowance = isRegularBenefits ? regularBenefitsTrade.isLoadingAllowance : (isStake ? stakeTrade.isLoadingAllowance : false);
 
     const check = async (): Promise<boolean> => {
         if (!token) {
             return false;
         }
-        if (!selectedAccountAddress) {
+        if (!effectiveAccountAddress) {
             console.error('未选择账户地址');
             return false;
         }
-        const KYCStatusResponse = await api.kyc.getKycStatus({ tokenAddress, userAddressToCheck: selectedAccountAddress });
+
+        // 检查当前网络是否与代币所在网络匹配
+        if (token.chain?.chain_id && chainId) {
+            // 解析代币的 chain_id（可能是十六进制字符串或数字字符串）
+            let tokenChainId: number | null = null;
+            const chainIdStr = token.chain.chain_id.toString();
+            // 如果是十六进制格式（0x开头），转换为数字
+            if (chainIdStr.startsWith('0x') || chainIdStr.startsWith('0X')) {
+                tokenChainId = parseInt(chainIdStr, 16);
+            } else {
+                // 否则直接解析为数字
+                tokenChainId = parseInt(chainIdStr, 10);
+            }
+
+            // 如果解析失败或网络不匹配，提示用户
+            if (tokenChainId === null || isNaN(tokenChainId) || chainId !== tokenChainId) {
+                show(
+                    <ModalContent
+                        title="提示"
+                        message={`当前网络与代币所在网络不匹配，请切换到 ${token.chain.display_name || token.chain.name || '对应网络'}`}
+                        buttons={
+                            <Button color="primary" onPress={hide}>
+                                我知道了
+                            </Button>
+                        }
+                    />
+                );
+                return false;
+            }
+        }
+
+        const KYCStatusResponse = await api.kyc.getKycStatus({ tokenAddress, userAddressToCheck: effectiveAccountAddress });
         console.log("KYCStatusResponse----------------------")
         console.log(KYCStatusResponse);
         if (!KYCStatusResponse.success) {
@@ -250,7 +315,7 @@ export default function TokenDetailScreen() {
                         <Button key="kyc" color="primary" onPress={async () => {
                             hide();
                             // 检查必要参数
-                            if (!selectedAccountAddress || !tokenAddress || !token.factory_address) {
+                            if (!effectiveAccountAddress || !tokenAddress || !token.factory_address) {
                                 Alert.alert('错误', '缺少必要参数');
                                 return;
                             }
@@ -258,7 +323,7 @@ export default function TokenDetailScreen() {
                                 // 直接调用 KYC 验证方法
                                 await startKYCVerificationWithAlert(
                                     {
-                                        walletAddress: selectedAccountAddress,
+                                        walletAddress: effectiveAccountAddress,
                                         tokenAddress: tokenAddress,
                                         factoryAddress: token.factory_address,
                                         chainId: '11155111',
@@ -288,15 +353,17 @@ export default function TokenDetailScreen() {
             );
             return false;
         }
-        if (KYCStatusResponse.data.walletaddress !== selectedAccountAddress) {
+        if (KYCStatusResponse.data.walletaddress.toLocaleLowerCase() !== effectiveAccountAddress?.toLocaleLowerCase()) {
             show(
                 <ModalContent
                     title="提示"
                     message={`当前地址不能购买${token?.symbol}，当前账号绑定地址：${formatAddress(KYCStatusResponse.data.walletaddress)}`}
                     buttons={
+                        <>
                         <Button color="primary" onPress={hide}>
                             我知道了
                         </Button>
+                        </>
                     }
                 />
             );
@@ -356,9 +423,9 @@ export default function TokenDetailScreen() {
                         setLoading(true);
                         setError(null);
                     }
-                    
+
                     const response = await api.token.getTokenList({ tokenAddress });
-                    
+
                     // 检查组件是否仍然挂载
                     if (!isMounted) {
                         return;
@@ -421,9 +488,17 @@ export default function TokenDetailScreen() {
                 {...props}
                 disappearsOnIndex={-1}
                 appearsOnIndex={0}
+                style={[
+                    props.style,
+                    {
+                        backgroundColor: colorScheme === 'dark' 
+                            ? 'rgba(0, 0, 0, 0.5)' 
+                            : 'rgba(0, 0, 0, 0.3)',
+                    },
+                ]}
             />
         ),
-        []
+        [colorScheme]
     );
 
     // 信息卡片组件
@@ -720,7 +795,7 @@ export default function TokenDetailScreen() {
                                 className="text-sm mb-2"
                                 style={{ color: colors.textSecondary }}
                             >
-                                投资金额
+                                {isStake ? '质押数量' : '投资金额'}
                             </Text>
                             <TextInput
                                 className="w-full rounded-xl"
@@ -732,7 +807,7 @@ export default function TokenDetailScreen() {
                                     paddingVertical: 14,
                                     height: 52,
                                 }}
-                                placeholder="请输入投资金额"
+                                placeholder={isStake ? '请输入质押数量' : '请输入投资金额'}
                                 placeholderTextColor={colors.textTertiary}
                                 value={investmentAmount}
                                 onChangeText={setInvestmentAmount}
@@ -754,7 +829,7 @@ export default function TokenDetailScreen() {
                                 bottomSheetRef.current?.expand();
                             }}
                         >
-                            投资
+                            {isStake ? '质押' : '投资'}
                         </Button>
                     </View>
                 )}
@@ -768,10 +843,12 @@ export default function TokenDetailScreen() {
                 backdropComponent={renderBackdrop}
                 enableDynamicSizing={false}
                 enablePanDownToClose={true}
+                backgroundStyle={{ backgroundColor: colors.background }}
+                handleIndicatorStyle={{ backgroundColor: colors.textSecondary }}
             >
                 <BottomSheetView className='flex-1 px-4 py-6'>
                     <Text className="text-xl font-bold mb-6" style={{ color: colors.text }}>
-                        购买预览
+                        {isStake ? '质押预览' : '购买预览'}
                     </Text>
 
                     <View className="mb-4">
@@ -786,62 +863,51 @@ export default function TokenDetailScreen() {
                             </Text>
                         </View>
 
-                        <View className="flex-row justify-between items-center mb-3">
-                            <Text className="text-base" style={{ color: colors.textSecondary }}>
-                                价格
-                            </Text>
-                            <Text className="text-base font-semibold" style={{ color: colors.text }}>
-                                ${formatPrice(token?.sale_plan?.price || '0', token?.decimals || 18)}
-                            </Text>
-                        </View>
-
-                        <View className="flex-row justify-between items-center mb-3">
-                            <Text className="text-base" style={{ color: colors.textSecondary }}>
-                                网络费用
-                            </Text>
-                            {!isRegularBenefits ? (
-                                <Text className="text-base font-semibold" style={{ color: colors.textTertiary }}>
-                                    --
+                        {!isStake && (
+                            <View className="flex-row justify-between items-center mb-3">
+                                <Text className="text-base" style={{ color: colors.textSecondary }}>
+                                    价格
                                 </Text>
-                            ) : !isConnected ? (
-                                <Text className="text-base font-semibold" style={{ color: colors.textTertiary }}>
-                                    请连接钱包
-                                </Text>
-                            ) : needsApprove === null ? (
-                                <View className="flex-row items-center">
-                                    <ActivityIndicator size="small" color={colors.primary} />
-                                    <Text className="text-xs ml-2" style={{ color: colors.textTertiary }}>
-                                        检查授权中...
-                                    </Text>
-                                </View>
-                            ) : needsApprove === true ? (
-                                <Text className="text-base font-semibold" style={{ color: colors.textTertiary }}>
-                                    需要先授权
-                                </Text>
-                            ) : !shouldEstimateGas ? (
-                                <Text className="text-base font-semibold" style={{ color: colors.textTertiary }}>
-                                    --
-                                </Text>
-                            ) : gasEstimateError ? (
-                                <Text className="text-base font-semibold" style={{ color: colors.textTertiary }}>
-                                    估算失败
-                                </Text>
-                            ) : isEstimatingGas || isLoadingGasPrice || gasFeeInNative === null ? (
-                                <View className="flex-row items-center">
-                                    <ActivityIndicator size="small" color={colors.primary} />
-                                    <Text className="text-xs ml-2" style={{ color: colors.textTertiary }}>
-                                        估算中...
-                                    </Text>
-                                </View>
-                            ) : (
                                 <Text className="text-base font-semibold" style={{ color: colors.text }}>
-                                    {parseFloat(gasFeeInNative).toFixed(6)} {nativeCurrencySymbol}
+                                    ${formatPrice(token?.sale_plan?.price || '0', token?.decimals || 18)}
                                 </Text>
-                            )}
-                        </View>
+                            </View>
+                        )}
+
+                        {/* 授权状态提示 */}
+                        {(isRegularBenefits || isStake) && (
+                            <View className="mb-3">
+                                {!isConnected ? (
+                                    <View className="rounded-xl p-3" style={{ backgroundColor: colors.backgroundSecondary }}>
+                                        <Text className="text-sm" style={{ color: colors.textTertiary }}>
+                                            请先连接钱包
+                                        </Text>
+                                    </View>
+                                ) : isLoadingAllowance || needsApprove === null ? (
+                                    <View className="flex-row items-center rounded-xl p-3" style={{ backgroundColor: colors.backgroundSecondary }}>
+                                        <ActivityIndicator size="small" color={colors.primary} />
+                                        <Text className="text-sm ml-2" style={{ color: colors.textTertiary }}>
+                                            检查授权状态中...
+                                        </Text>
+                                    </View>
+                                ) : needsApprove === true ? (
+                                    <View className="rounded-xl p-3" style={{ backgroundColor: colors.backgroundSecondary }}>
+                                        <Text className="text-sm" style={{ color: colors.primary }}>
+                                            ⚠️ {isStake ? '需要先授权代币才能进行质押' : '需要先授权 USDT 才能进行购买'}
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <View className="rounded-xl p-3" style={{ backgroundColor: colors.backgroundSecondary }}>
+                                        <Text className="text-sm" style={{ color: colors.textSecondary }}>
+                                            ✓ 授权状态正常，{isStake ? '可以质押' : '可以购买'}
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
+                        )}
                     </View>
 
-                    {!isRegularBenefits ? (
+                    {!isRegularBenefits && !isStake ? (
                         <Button
                             className="w-full mt-4"
                             color="primary"
@@ -862,11 +928,20 @@ export default function TokenDetailScreen() {
                                 alignSelf: 'stretch',
                             }}
                             onPress={() => {
-                                regularBenefitsTrade.approve();
+                                if (isRegularBenefits) {
+                                    regularBenefitsTrade.approve();
+                                } else if (isStake) {
+                                    stakeTrade.approve();
+                                }
                             }}
-                            disabled={isApproving || isWaitingApprove || !regularBenefitsTrade.canApprove}
+                            disabled={
+                                isApproving || 
+                                isWaitingApprove || 
+                                (isRegularBenefits && !regularBenefitsTrade.canApprove) ||
+                                (isStake && !stakeTrade.canApprove)
+                            }
                         >
-                            {isApproving ? '授权中...' : isWaitingApprove ? '等待确认中...' : '授权 USDT'}
+                            {isApproving ? '授权中...' : isWaitingApprove ? '等待确认中...' : (isStake ? '授权代币' : '授权 USDT')}
                         </Button>
                     ) : (
                         <Button
@@ -877,11 +952,19 @@ export default function TokenDetailScreen() {
                                 alignSelf: 'stretch',
                             }}
                             onPress={() => {
-                                regularBenefitsTrade.purchase();
+                                if (isRegularBenefits) {
+                                    regularBenefitsTrade.purchase();
+                                } else if (isStake) {
+                                    stakeTrade.stake();
+                                }
                             }}
-                            disabled={isPurchasing || !regularBenefitsTrade.canPurchase}
+                            disabled={
+                                isPurchasing || 
+                                (isRegularBenefits && !regularBenefitsTrade.canPurchase) ||
+                                (isStake && !stakeTrade.canStake)
+                            }
                         >
-                            {isPurchasing ? '交易中...' : '确认购买'}
+                            {isPurchasing ? (isStake ? '质押中...' : '交易中...') : (isStake ? '确认质押' : '确认购买')}
                         </Button>
                     )}
                 </BottomSheetView>

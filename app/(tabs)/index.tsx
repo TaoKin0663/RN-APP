@@ -42,6 +42,7 @@ export default function HomeScreen() {
         <ThemedView style={styles.titleContainer}>
           <ThemedText type="title">AppKit</ThemedText>
           <ThemedText type="subtitle">for React Native</ThemedText>
+          <Text>{isConnected ? '已连接' : '未连接'}</Text>
         </ThemedView>
         <WalletInfoView />
         

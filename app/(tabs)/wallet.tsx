@@ -1,18 +1,23 @@
-import { View, Text, TouchableOpacity, Alert, Animated } from "react-native"
+import { View, Text, TouchableOpacity, Alert, Animated, StyleSheet, ImageBackground } from "react-native"
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/hooks/use-theme";
 import { Colors } from "@/config/theme";
-import { useAccount, useSwitchChain, useChainId } from "wagmi";
+import { useSwitchChain, useChainId, useDisconnect } from "wagmi";
 import { useAvatarGenerator } from "@/hooks/useAvatarGenerator";
 import Jazzicon from "react-native-jazzicon";
 import { formatAddress } from "@/utils/common";
 import { useMemo, useRef, useCallback, useState, useEffect } from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { useAppKit, useAccount } from '@reown/appkit-react-native';
+import { Image } from "expo-image";
+import { useUserStore } from "@/store";
 import {
   BottomSheetModal,
   BottomSheetScrollView,
   BottomSheetBackdrop,
+  BottomSheetFooter,
+  BottomSheetFooterProps
 } from "@gorhom/bottom-sheet";
 import { api } from "@/services/api/api";
 import * as Clipboard from "expo-clipboard";
@@ -25,8 +30,9 @@ import { TokenIcon } from "@/components/TokenIcon";
 import { formatUnits, type Address } from "viem";
 import { ScrollView } from "react-native";
 import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { tokenABI } from "@/utils/ABI/token";
+import { tokenStakeABI } from "@/utils/ABI/token_stake";
 enum TokenType {
   REGULAR_BENEFITS = "REGULAR_BENEFITS",
   STAKE = "STAKE",
@@ -135,6 +141,11 @@ function TokenListItem({
   userAddress?: string;
   chainId?: number;
 }) {
+  const redeemSheetRef = useRef<BottomSheetModal>(null);
+  const [redeemVisible, setRedeemVisible] = useState(false);
+  const insets = useSafeAreaInsets();
+  const redeemingIndexRef = useRef<number | null>(null);
+  const router = useRouter();
   // 解析 token 的 chainId（可能是十六进制字符串或数字字符串）
   const tokenChainId = useMemo(() => {
     if (!token.chain?.chain_id) return null;
@@ -166,10 +177,10 @@ function TokenListItem({
 
   // 获取待领取分红（仅对 REGULAR_BENEFITS 类型）
   const isRegularBenefits = token.type === TokenType.REGULAR_BENEFITS;
-  const { 
-    data: pendingDividends, 
+  const {
+    data: pendingDividends,
     isLoading: isLoadingDividends,
-    refetch: refetchPendingDividends 
+    refetch: refetchPendingDividends
   } = useReadContract({
     address: token.address as Address,
     abi: tokenABI,
@@ -198,6 +209,123 @@ function TokenListItem({
       retryDelay: 2000,
     },
   });
+
+  const { data: userStakeInfo, isLoading: isLoadingStakeInfo, refetch: refetchUserStakeInfo } = useReadContract({
+    address: token.address as Address,
+    abi: tokenStakeABI,
+    functionName: 'getUserStakeInfo',
+    args: userAddress ? [userAddress as Address] : undefined,
+    query: {
+      enabled: token.type === TokenType.STAKE && !!token.address && !!userAddress && isTokenOnCurrentChain,
+    },
+    chainId: chainId,
+  });
+  const stakeAmount = useMemo(() => {
+    if (!userStakeInfo) return 0n;
+    const amount = userStakeInfo[1] as bigint;
+    return amount ?? 0n;
+  }, [userStakeInfo]);
+  const canRedeem = useMemo(() => {
+    if (!isTokenOnCurrentChain) return false;
+    if (isLoadingStakeInfo) return false;
+    if (!userAddress || !token.address) return false;
+    return stakeAmount > 0n;
+  }, [isTokenOnCurrentChain, isLoadingStakeInfo, userAddress, token.address, stakeAmount]);
+  const stakeLength = useMemo(() => {
+    if (!userStakeInfo) return 0;
+    const len = userStakeInfo[0] as bigint;
+    try {
+      return Number(len);
+    } catch {
+      return 0;
+    }
+  }, [userStakeInfo]);
+  const redeemContracts = useMemo(() => {
+    if (!redeemVisible) return [];
+    if (!userAddress || !token.address || !isTokenOnCurrentChain) return [];
+    if (!stakeLength || stakeLength <= 0) return [];
+    return Array.from({ length: stakeLength }, (_, i) => ({
+      address: token.address as Address,
+      abi: tokenStakeABI,
+      functionName: 'getUserStake' as const,
+      args: [userAddress as Address, BigInt(i)],
+      chainId,
+    }));
+  }, [redeemVisible, userAddress, token.address, isTokenOnCurrentChain, stakeLength, chainId]);
+  const { data: stakeDetails, isLoading: isLoadingStakeDetails, refetch: refetchStakeDetails } = useReadContracts({
+    contracts: redeemContracts,
+    allowFailure: false,
+    query: {
+      enabled: redeemVisible && !!redeemContracts.length,
+    },
+  });
+  const parsedStakes = useMemo(() => {
+    if (!stakeDetails || !Array.isArray(stakeDetails)) return [];
+    return (stakeDetails as any[]).map((it: any) => {
+      const r = (it && typeof it === 'object' && 'result' in it) ? (it as any).result : it;
+      const [amount, stakeTime, canRedeem, reward, ir, pid] = r as [bigint, bigint, boolean, bigint, boolean, bigint];
+      return { amount, stakeTime, canRedeem, reward, ir, pid };
+    });
+  }, [stakeDetails]);
+  const handleOpenRedeemSheet = useCallback(() => {
+    if (!canRedeem) return;
+    router.push({
+      pathname: '/redeem' as any,
+      params: { tokenAddress: token.address }
+    });
+    // setRedeemVisible(true);
+    // redeemSheetRef.current?.present();
+    // refetchStakeDetails();
+  }, [canRedeem, refetchStakeDetails]);
+  const handleCloseRedeemSheet = useCallback(() => {
+    setRedeemVisible(false);
+    redeemSheetRef.current?.dismiss();
+  }, []);
+
+  // 赎回交易
+  const {
+    writeContract: writeRedeem,
+    isPending: isRedeeming,
+    data: redeemTxHash,
+    error: redeemError,
+  } = useWriteContract();
+  const { data: redeemReceipt, isLoading: isWaitingRedeem } = useWaitForTransactionReceipt({
+    hash: redeemTxHash,
+    query: {
+      enabled: !!redeemTxHash,
+      retry: 3,
+      retryDelay: 2000,
+    },
+  });
+  useEffect(() => {
+    if (!redeemReceipt) return;
+    if (redeemReceipt.status === 'success') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      refetchStakeDetails();
+      refetchUserStakeInfo();
+    } else if (redeemReceipt.status === 'reverted') {
+      Alert.alert('错误', '赎回交易失败');
+    }
+    redeemingIndexRef.current = null;
+  }, [redeemReceipt, refetchStakeDetails, refetchUserStakeInfo]);
+  useEffect(() => {
+    if (redeemError) {
+      console.error('赎回错误:', redeemError);
+      Alert.alert('错误', redeemError.message || '赎回失败，请稍后重试');
+      redeemingIndexRef.current = null;
+    }
+  }, [redeemError]);
+  const onRedeem = useCallback((index: number) => {
+    if (!isTokenOnCurrentChain || !userAddress || !token.address) return;
+    redeemingIndexRef.current = index;
+    writeRedeem({
+      address: token.address as Address,
+      abi: tokenStakeABI,
+      functionName: 'redeem',
+      args: [BigInt(index)],
+      chainId,
+    });
+  }, [isTokenOnCurrentChain, userAddress, token.address, writeRedeem, chainId]);
 
   // 交易确认成功后刷新待领取分红数据
   useEffect(() => {
@@ -231,7 +359,7 @@ function TokenListItem({
   // 处理领取分红
   const handleClaimDividends = useCallback(() => {
     if (!canClaimDividends || !userAddress || !token.address) return;
-    
+
     try {
       writeClaimDividends({
         address: token.address as Address,
@@ -335,6 +463,24 @@ function TokenListItem({
     }
   };
 
+
+  const renderFooter = useCallback(
+    (props: BottomSheetFooterProps) => (
+      <BottomSheetFooter {...props} bottomInset={0}>
+        <View style={{
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 20,
+          paddingHorizontal: 16,
+          backgroundColor: colors.background, // 确保背景色遮住下方内容
+        }}>
+          <Button color="primary" onPress={() => { }}>
+            赎回
+          </Button>
+        </View>
+      </BottomSheetFooter>
+    ),
+    [insets.bottom]
+  );
+
   return (
     <View
       className="mb-4 p-4 rounded-xl"
@@ -356,10 +502,20 @@ function TokenListItem({
           <Text className="text-sm" style={{ color: colors.textSecondary }}>余额</Text>
           <Text className="text-sm" style={{ color: colors.text }}>{formatBalance()}</Text>
         </View>
-        <View className="flex-row items-center justify-between">
+        <View className="flex-row items-center justify-between mb-2.5">
           <Text className="text-sm" style={{ color: colors.textSecondary }}>待领取分红</Text>
           <Text className="text-sm" style={{ color: '#FF4444' }}>{formatPendingDividends()}</Text>
         </View>
+        {
+          token.type == TokenType.STAKE && (
+            <View className="flex-row items-center justify-between">
+              <Text className="text-sm" style={{ color: colors.textSecondary }}>质押数量</Text>
+              <Text className="text-sm" style={{ color: colors.text }}>
+                {isLoadingStakeInfo ? '加载中...' : formatUnits(stakeAmount, token.decimals)}
+              </Text>
+            </View>
+          )
+        }
       </View>
 
       {/* 操作按钮 */}
@@ -368,7 +524,7 @@ function TokenListItem({
           <Button
             className="py-2.5 px-3 rounded-lg items-center border-[0px] w-[auto] min-h-[0px] min-w-[0px]"
             style={{
-              backgroundColor: canClaimDividends 
+              backgroundColor: canClaimDividends
                 ? (colors.backgroundTertiary || colors.background)
                 : (colors.backgroundTertiary || colors.background),
               opacity: canClaimDividends ? 1 : 0.5,
@@ -376,14 +532,144 @@ function TokenListItem({
             onPress={handleClaimDividends}
             disabled={!canClaimDividends}
           >
-            <Text 
-              className="text-sm font-medium" 
-              style={{ 
-                color: canClaimDividends ? colors.textSecondary : colors.textTertiary 
+            <Text
+              className="text-sm font-medium"
+              style={{
+                color: canClaimDividends ? colors.textSecondary : colors.textTertiary
               }}
             >
               {isClaiming || isWaitingClaim ? '领取中...' : '领取分红'}
             </Text>
+          </Button>
+        </View>
+      )}
+
+      {token.type == TokenType.STAKE && (
+        <View className="flex-row gap-2 justify-end">
+          <Button
+            className="py-2.5 px-3 rounded-lg items-center border-[0px] w-[auto] min-h-[0px] min-w-[0px]"
+            style={{
+              backgroundColor: canRedeem
+                ? (colors.backgroundTertiary || colors.background)
+                : (colors.backgroundTertiary || colors.background),
+              opacity: canRedeem ? 1 : 0.5,
+            }}
+            onPress={handleOpenRedeemSheet}
+            disabled={!canRedeem}
+          >
+            <Text
+              className="text-sm font-medium"
+              style={{
+                color: canRedeem ? colors.textSecondary : colors.textTertiary
+              }}
+            >
+              {'赎回'}
+              {/* {isClaiming || isWaitingClaim ? '赎回中...' : '赎回'} */}
+            </Text>
+          </Button>
+        </View>
+      )}
+
+      <BottomSheetModal
+        ref={redeemSheetRef}
+        snapPoints={['50%', '80%']}
+        enableDynamicSizing={false}
+        enablePanDownToClose={true}
+        backdropComponent={(props) => <BottomSheetBackdrop appearsOnIndex={0} disappearsOnIndex={-1} {...props} />}
+        backgroundStyle={{ backgroundColor: colors.background }}
+        handleIndicatorStyle={{ backgroundColor: colors.textSecondary }}
+        onDismiss={handleCloseRedeemSheet}
+        activeOffsetY={[-50, 50]}
+        footerComponent={renderFooter}
+      >
+        <BottomSheetScrollView
+          style={{ paddingHorizontal: 16, paddingTop: 8 }}
+          bounces={true}
+          alwaysBounceVertical={true}  // 即使内容不满一屏也允许回弹手势传递
+          overScrollMode="always"      // 允许 Android 上的越界
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingTop: 8,
+            paddingBottom: insets.bottom + 40
+          }}>
+          <View className="mb-3">
+            <Text className="text-base font-semibold" style={{ color: colors.text }}>赎回明细</Text>
+            <Text className="text-xs mt-1" style={{ color: colors.textSecondary }}>
+              {stakeLength > 0 ? `共 ${stakeLength} 笔质押` : '暂无可赎回记录'}
+            </Text>
+          </View>
+          {isLoadingStakeDetails && (
+            <Text className="text-sm" style={{ color: colors.textSecondary }}>加载中...</Text>
+          )}
+          {!isLoadingStakeDetails && parsedStakes.map((s, idx) => (
+            <StakeRedeemRow
+              key={idx}
+              s={s}
+              idx={idx}
+              tokenDecimals={token.decimals}
+              colors={colors}
+              onRedeem={onRedeem}
+            />
+          ))}
+          {!isLoadingStakeDetails && parsedStakes.length === 0 && (
+            <Text className="text-sm" style={{ color: colors.textTertiary }}>暂无数据</Text>
+          )}
+        </BottomSheetScrollView>
+      </BottomSheetModal>
+    </View>
+  );
+}
+
+function StakeRedeemRow({
+  s,
+  idx,
+  tokenDecimals,
+  colors,
+  onRedeem,
+}: {
+  s: { amount: bigint; stakeTime: bigint; canRedeem: boolean; reward: bigint; ir: boolean; pid: bigint };
+  idx: number;
+  tokenDecimals: number;
+  colors: typeof Colors.dark;
+  onRedeem: (index: number) => void;
+}) {
+  return (
+    <View className="mb-3 p-3 rounded-lg" style={{ backgroundColor: colors.background }}>
+      <View className="flex-row items-center justify-between mb-2">
+        <Text className="text-sm" style={{ color: colors.textSecondary }}>金额</Text>
+        <Text className="text-sm" style={{ color: colors.text }}>{formatUnits(s.amount, tokenDecimals)}</Text>
+      </View>
+      <View className="flex-row items-center justify-between mb-2">
+        <Text className="text-sm" style={{ color: colors.textSecondary }}>收益</Text>
+        <Text className="text-sm" style={{ color: colors.text }}>{formatUnits(s.reward, tokenDecimals)}</Text>
+      </View>
+      <View className="flex-row items-center justify-between mb-2">
+        <Text className="text-sm" style={{ color: colors.textSecondary }}>质押时间</Text>
+        <Text className="text-sm" style={{ color: colors.text }}>
+          {(() => {
+            try {
+              const t = Number(s.stakeTime) * 1000;
+              return new Date(t).toLocaleString();
+            } catch {
+              return '-';
+            }
+          })()}
+        </Text>
+      </View>
+      <View className="flex-row items-center justify-between">
+        <Text className="text-sm" style={{ color: colors.textSecondary }}>可赎回</Text>
+        <Text className="text-sm" style={{ color: s.canRedeem ? colors.text : colors.textTertiary }}>
+          {s.canRedeem ? '是' : '否'}
+        </Text>
+      </View>
+      {s.canRedeem && (
+        <View className="mt-2 items-end">
+          <Button
+            color="primary"
+            onPress={() => onRedeem(idx)}
+            className="py-1 px-2 w-[auto] min-h-[0] min-w-[0]"
+          >
+            <Text className="text-sm" style={{ color: colors.textSecondary }}>赎回</Text>
           </Button>
         </View>
       )}
@@ -406,10 +692,12 @@ export default function Wallet() {
   const router = useRouter();
   const { colorScheme } = useTheme();
   const colors = Colors[colorScheme ?? 'dark'];
-  const { address, chainId } = useAccount();
+  const { address, chainId, isConnected } = useAccount();
   const currentChainId = useChainId();
   const { switchChainAsync } = useSwitchChain();
+  const { disconnect } = useDisconnect();
   const { generateAvatar } = useAvatarGenerator();
+  const { open } = useAppKit();
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
   const [safes, setSafes] = useState<string[]>([]);
   const [loadingSafes, setLoadingSafes] = useState(false);
@@ -423,12 +711,15 @@ export default function Wallet() {
   // 获取 tabbar 高度，用于设置底部内边距
   const tabBarHeight = useBottomTabOverflow();
 
-  // 从 store 获取当前选中的账户地址
-  const selectedAccountAddress = useAppStore((state) => state.selectedAccountAddress);
-  const setSelectedAccountAddress = useAppStore((state) => state.setSelectedAccountAddress);
+  // 从 store 获取当前选中的 Safe 地址
+  const selectedSafeAddress = useAppStore((state) => state.selectedSafeAddress);
+  const setSelectedSafeAddress = useAppStore((state) => state.setSelectedSafeAddress);
 
-  // 当前显示的地址：优先使用选中的地址，如果没有则使用连接的钱包地址
-  const displayAddress = selectedAccountAddress || address;
+  // 获取用户信息
+  const { userInfo, isLoggedIn } = useUserStore();
+
+  // 当前显示的地址：优先使用选中的 Safe 地址，如果没有则使用连接的钱包地址
+  const displayAddress = selectedSafeAddress || address;
 
   const avatarSeed = useMemo(() => {
     if (!displayAddress) return null;
@@ -469,19 +760,12 @@ export default function Wallet() {
     return addresses;
   }, [address, safes]);
 
-  // 当连接的钱包地址变化时，如果当前没有选中的地址，则自动选中连接的钱包地址
+  // 如果选中的 Safe 地址不在 Safe 列表中，则重置为 null
   useEffect(() => {
-    if (address && !selectedAccountAddress) {
-      setSelectedAccountAddress(address);
+    if (selectedSafeAddress && safes.length > 0 && !safes.includes(selectedSafeAddress)) {
+      setSelectedSafeAddress(null);
     }
-  }, [address, selectedAccountAddress, setSelectedAccountAddress]);
-
-  // 如果选中的地址不在账户列表中，则重置为连接的钱包地址
-  useEffect(() => {
-    if (selectedAccountAddress && allAddresses.length > 0 && !allAddresses.includes(selectedAccountAddress)) {
-      setSelectedAccountAddress(address || null);
-    }
-  }, [selectedAccountAddress, allAddresses, address, setSelectedAccountAddress]);
+  }, [selectedSafeAddress, safes, setSelectedSafeAddress]);
 
   // 为所有地址生成头像映射
   const addressAvatars = useMemo(() => {
@@ -501,7 +785,7 @@ export default function Wallet() {
 
     try {
       loadingSafeAddresses.current.add(safeAddress);
-      const response = await api.safe.getSafeInfo(chainId, safeAddress);
+      const response = await api.safe.getSafeInfo(chainId as number, safeAddress);
       if (response.success && response.data) {
         setSafeInfos(prev => ({ ...prev, [safeAddress]: response.data }));
       }
@@ -521,7 +805,7 @@ export default function Wallet() {
 
     try {
       setLoadingSafes(true);
-      const response = await api.safe.getSafesByOwnerAddress(chainId, address);
+      const response = await api.safe.getSafesByOwnerAddress(chainId as number, address);
       if (response.success && response.data) {
         const safeAddresses = response.data.safes || [];
         setSafes(safeAddresses);
@@ -552,6 +836,30 @@ export default function Wallet() {
   const handleCloseModal = useCallback(() => {
     bottomSheetModalRef.current?.dismiss();
   }, []);
+
+  // 断开钱包连接
+  const handleDisconnect = useCallback(() => {
+    Alert.alert(
+      '确认断开',
+      '您确定要断开钱包连接吗？',
+      [
+        {
+          text: '取消',
+          style: 'cancel',
+        },
+        {
+          text: '确认',
+          style: 'destructive',
+          onPress: () => {
+            disconnect();
+            setSelectedSafeAddress(null);
+            handleCloseModal();
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          },
+        },
+      ]
+    );
+  }, [disconnect, setSelectedSafeAddress, handleCloseModal]);
 
   // 复制地址到剪贴板
   const handleCopyAddress = useCallback(async (addr: string) => {
@@ -612,19 +920,12 @@ export default function Wallet() {
     fetchTokenList();
   }, [fetchTokenList]);
 
-  const test = () => {
-    router.push({
-      pathname: '/transaction-progress',
-      params: { hash: '0xd83f14ee77bd6bdd5a27479de788a343ee4518850601299ef58bdbd30789dd1e' },
-    });
-  }
-
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
       {/* 顶部栏：左上角显示钱包地址和头像，右上角显示网络选择器 */}
       <View className="flex-row items-center justify-between px-5 pt-2.5 pb-5">
-        {/* 左上角：钱包地址和头像 */}
-        {displayAddress && (
+        {/* 左上角：钱包地址和头像或连接钱包按钮 */}
+        {displayAddress ? (
           <TouchableOpacity
             onPress={handlePresentModalPress}
             activeOpacity={0.7}
@@ -638,22 +939,124 @@ export default function Wallet() {
             </Text>
             <MaterialIcons name="arrow-drop-down" size={20} color={colors.text} />
           </TouchableOpacity>
+        ) : (
+          <View>
+            <Button
+              color="primary"
+              onPress={() => open({ view: 'Connect' })}
+              // className="py-2.5 px-3 rounded-lg items-center border-[0px] w-[auto] min-h-[0px] min-w-[0px]"
+              className="px-4 py-2 w-[auto] min-h-[0] min-w-[0]"
+            >
+              <Text className="text-sm font-medium" style={{ color: colors.text }}>连接钱包</Text>
+            </Button>
+          </View>
         )}
 
         {/* 右上角：网络选择器 */}
-        <NetworkSelector
-          selectedNetwork={selectedNetwork}
-          onSelectNetwork={handleSelectNetwork}
-          networks={defaultNetworks}
-        />
+        {
+          isConnected && (
+            <NetworkSelector
+              selectedNetwork={selectedNetwork}
+              onSelectNetwork={handleSelectNetwork}
+              networks={defaultNetworks}
+            />
+          )
+        }
       </View>
 
-      {/* 代币列表 */}
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: tabBarHeight + 20 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* 用户信息卡片 */}
+        {isLoggedIn && userInfo && (
+          <ImageBackground
+            source={require('@/assets/images/Banner.png')}
+            style={{
+              marginBottom: 16,
+              borderRadius: 16,
+              overflow: 'hidden',
+            }}
+            imageStyle={{
+              borderRadius: 16,
+            }}
+            resizeMode="cover"
+          >
+            <View
+              className="p-4 flex-row items-center"
+              style={{
+                minHeight: 120,
+              }}
+            >
+              {/* 左侧：头像和用户ID */}
+              <View className="flex-1">
+                {/* 头像 */}
+                <View className="mb-3">
+                  {userInfo.avatar ? (
+                    <Image
+                      source={{ uri: userInfo.avatar }}
+                      style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: 28,
+                        borderWidth: 2,
+                        borderColor: 'rgba(255, 255, 255, 0.3)',
+                      }}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: 28,
+                        backgroundColor: colors.primary || colors.tint,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        borderWidth: 2,
+                        borderColor: 'rgba(255, 255, 255, 0.3)',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 24,
+                          fontWeight: '700',
+                          color: '#FFFFFF',
+                        }}
+                      >
+                        {userInfo.username?.charAt(0)?.toUpperCase() || 'U'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                {/* 用户ID */}
+                <View className="flex-row items-center">
+                  <Text className="text-sm mr-2" style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                    用户ID:
+                  </Text>
+                  <Text className="text-sm flex-1" style={{ color: '#FFFFFF', fontFamily: 'monospace' }}>
+                    {userInfo.id || 'N/A'}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (userInfo.id) {
+                        handleCopyAddress(userInfo.id);
+                        Alert.alert('已复制', '用户ID已复制到剪贴板');
+                      }
+                    }}
+                    activeOpacity={0.7}
+                    className="ml-2 p-1"
+                  >
+                    <MaterialIcons name="content-copy" size={16} color="rgba(255, 255, 255, 0.8)" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </ImageBackground>
+        )}
+
+        {/* 代币列表 */}
         {loadingTokens ? (
           <View className="items-center justify-center py-10">
             <Text className="text-sm" style={{ color: colors.textSecondary }}>加载中...</Text>
@@ -669,7 +1072,7 @@ export default function Wallet() {
               token={token}
               colors={colors}
               userAddress={displayAddress}
-              chainId={currentChainId || chainId}
+              chainId={currentChainId || chainId as number}
             />
           ))
         )}
@@ -691,6 +1094,25 @@ export default function Wallet() {
         index={0}
       >
         <View style={{ flex: 1 }}>
+          {/* 顶部标题栏 */}
+          <View className="flex-row items-center justify-between px-4 pt-4 pb-2">
+            <Text className="text-lg font-semibold" style={{ color: colors.text }}>
+              我的账户
+            </Text>
+            {address && (
+              <Button
+                color="error"
+                variant="outline"
+                onPress={handleDisconnect}
+                className="px-3 py-1.5"
+                style={{ minHeight: 32 }}
+                textStyle={{ fontSize: 14 }}
+              >
+                断开钱包
+              </Button>
+            )}
+          </View>
+
           <BottomSheetScrollView
             style={{ flex: 1 }}
             showsVerticalScrollIndicator={false}
@@ -700,9 +1122,6 @@ export default function Wallet() {
               paddingBottom: 80, // 为底部按钮留出空间
             }}
           >
-            <Text className="text-lg font-semibold mb-4" style={{ color: colors.text }}>
-              我的账户
-            </Text>
 
             {loadingSafes ? (
               <SkeletonList colors={colors} />
@@ -729,7 +1148,12 @@ export default function Wallet() {
                     }}
                     activeOpacity={0.7}
                     onPress={() => {
-                      setSelectedAccountAddress(addr);
+                      // 只设置 Safe 地址，不设置 EOA 地址
+                      if (isSafe) {
+                        setSelectedSafeAddress(addr);
+                      } else {
+                        setSelectedSafeAddress(null);
+                      }
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       handleCloseModal();
                     }}

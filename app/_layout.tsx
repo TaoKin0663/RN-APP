@@ -30,6 +30,7 @@ import { ModalProvider } from "@/components/ui/Modal";
 import { setApiTokenProvider } from '@/services/api/http';
 import { useUserStore } from '@/store';
 import { useEffect } from 'react';
+import { useAuthGuard } from '@/hooks/useAuthGuard';
 import '../global.css';
 
 const clipboardClient = {
@@ -58,7 +59,7 @@ const metadata = {
   },
 };
 
-const networks = [mainnet, polygon, arbitrum, base, optimism, bsc, sepolia];
+const networks = [sepolia,mainnet];//mainnet, polygon, arbitrum, base, optimism, bsc, 
 
 const wagmiAdapter = new WagmiAdapter({
   projectId,
@@ -101,6 +102,9 @@ function RootLayoutContent() {
     });
   }, []);
 
+  // 路由保护：检查登录状态并自动重定向
+  useAuthGuard(loaded);
+
   // 当 token 变化时，tokenProvider 会自动获取最新值（因为它是从 store 读取的）
 
   if (!loaded) {
@@ -118,6 +122,7 @@ function RootLayoutContent() {
                 <ModalProvider>
                   <Stack>
                     <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                    <Stack.Screen name="login" options={{ headerShown: false }} />
                     <Stack.Screen name="+not-found" />
                   </Stack>
                   <StatusBar style="auto" />

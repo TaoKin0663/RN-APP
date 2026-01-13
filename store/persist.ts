@@ -65,7 +65,7 @@ export const useAppStore = withPersist(appStoreCreator, {
     language: state.language,
     isFirstLaunch: state.isFirstLaunch,
     showOnboarding: state.showOnboarding,
-    selectedAccountAddress: state.selectedAccountAddress,
+    selectedSafeAddress: state.selectedSafeAddress,
   }),
 });
 

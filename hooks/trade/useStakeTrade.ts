@@ -2,23 +2,23 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { AppState } from 'react-native';
 import type { IToken } from '@/services/api/types';
 import { erc20Abi, type Address } from 'viem';
-import { tokenABI } from '@/utils/ABI/token';
+import { tokenStakeABI } from '@/utils/ABI/token_stake';
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 
 type Params = {
-  /** 仅当 token.type === REGULAR_BENEFITS 时开启 */
+  /** 仅当 token.type === STAKE 时开启 */
   enabled: boolean;
   token: IToken | null;
   tokenAddress?: string;
-  /** 购买数量（最小单位，已按 token.decimals parseUnits 后的 bigint） */
+  /** 质押数量（最小单位，已按 token.decimals parseUnits 后的 bigint） */
   tokenAmount: bigint | null;
-  /** 使用页面传入的“有效账户地址”（选中账户优先） */
+  /** 使用页面传入的"有效账户地址"（选中账户优先） */
   accountAddress?: string;
   /** 页面钱包连接状态 */
   isConnected: boolean;
 };
 
-export function useRegularBenefitsTrade({
+export function useStakeTrade({
   enabled,
   token,
   tokenAddress,
@@ -29,58 +29,24 @@ export function useRegularBenefitsTrade({
   const { address: connectedAddress } = useAccount();
   const effectiveAccountAddress = accountAddress ?? connectedAddress;
 
-  // 读取 USDT token 地址（来自 token 合约）
-  const { data: usdtTokenAddress } = useReadContract({
+  // 读取质押计划 ID
+  const { data: stakingPlanId } = useReadContract({
     address: (enabled ? (tokenAddress as Address | undefined) : undefined),
-    abi: tokenABI,
-    functionName: 'usdtToken',
+    abi: tokenStakeABI,
+    functionName: 'stakingPlanid',
     query: {
       enabled: enabled && !!tokenAddress && isConnected,
     },
   });
-  // 读取 USDT 精度（不同 USDT 合约可能是 6 或 18）
-  const { data: usdtDecimals } = useReadContract({
-    address: (enabled ? (usdtTokenAddress as Address | undefined) : undefined),
-    abi: erc20Abi,
-    functionName: 'decimals',
-    query: {
-      enabled: enabled && !!usdtTokenAddress && isConnected,
-    },
-  });
 
-  // 计算需要的 USDT 数量（BigInt 精确计算）
-  const usdtAmount = useMemo(() => {
-    if (!enabled) return null;
-    if (!token?.sale_plan?.price || !tokenAmount || usdtDecimals === undefined) {
-      return null;
-    }
-    try {
-      const priceRaw = BigInt(token.sale_plan.price);
-      const tokenDecimals = token.decimals;
-      const pow10 = (n: number) => 10n ** BigInt(n);
-
-      // cost(token.decimals) = tokenAmountBase * priceRaw / 10^token.decimals
-      let cost = (tokenAmount * priceRaw) / pow10(tokenDecimals);
-
-      // 将 cost 缩放到 USDT 的 decimals
-      const diff = Number(usdtDecimals) - tokenDecimals;
-      if (diff > 0) cost = cost * pow10(diff);
-      if (diff < 0) cost = cost / pow10(-diff);
-
-      return cost;
-    } catch {
-      return null;
-    }
-  }, [enabled, token?.sale_plan?.price, token?.decimals, tokenAmount, usdtDecimals]);
-
-  // 检查 USDT allowance
+  // 检查代币 allowance（质押需要 approve 代币本身给合约）
   const {
-    data: usdtAllowance,
+    data: tokenAllowance,
     refetch: refetchAllowance,
     isLoading: isLoadingAllowance,
     error: allowanceError,
   } = useReadContract({
-    address: (enabled ? (usdtTokenAddress as Address | undefined) : undefined),
+    address: (enabled ? (tokenAddress as Address | undefined) : undefined),
     abi: erc20Abi,
     functionName: 'allowance',
     args:
@@ -90,17 +56,16 @@ export function useRegularBenefitsTrade({
     query: {
       enabled:
         enabled &&
-        !!usdtTokenAddress &&
-        !!effectiveAccountAddress &&
         !!tokenAddress &&
+        !!effectiveAccountAddress &&
         isConnected,
       refetchInterval: 5000,
     },
   });
 
-  // 从钱包返回 App 时，强制刷新 allowance（解决后台暂停导致一直“检查授权中”）
+  // 从钱包返回 App 时，强制刷新 allowance（解决后台暂停导致一直"检查授权中"）
   const canRefetchAllowance =
-    enabled && isConnected && !!usdtTokenAddress && !!effectiveAccountAddress && !!tokenAddress;
+    enabled && isConnected && !!tokenAddress && !!effectiveAccountAddress;
 
   useEffect(() => {
     if (!enabled) return;
@@ -121,15 +86,15 @@ export function useRegularBenefitsTrade({
   // 检查是否需要 approve（null 表示还在检查中）
   const needsApprove = useMemo(() => {
     if (!enabled) return null;
-    if (usdtAllowance === undefined || usdtAmount === null) {
+    if (tokenAllowance === undefined || tokenAmount === null) {
       return null;
     }
     try {
-      return usdtAllowance === 0n || usdtAllowance < usdtAmount;
+      return tokenAllowance === 0n || tokenAllowance < tokenAmount;
     } catch {
       return null;
     }
-  }, [enabled, usdtAllowance, usdtAmount]);
+  }, [enabled, tokenAllowance, tokenAmount]);
 
   // 执行 approve
   const {
@@ -162,71 +127,68 @@ export function useRegularBenefitsTrade({
     enabled &&
     isConnected &&
     needsApprove === true &&
-    !!usdtTokenAddress &&
     !!tokenAddress &&
-    !!usdtAmount &&
+    !!tokenAmount &&
     !!effectiveAccountAddress;
 
   const approve = useCallback(() => {
     if (!canApprove) return;
     writeApprove({
-      address: usdtTokenAddress as Address,
+      address: tokenAddress as Address,
       abi: erc20Abi,
       functionName: 'approve',
-      args: [tokenAddress as Address, usdtAmount as bigint],
+      args: [tokenAddress as Address, tokenAmount as bigint],
     });
-  }, [canApprove, writeApprove, usdtTokenAddress, tokenAddress, usdtAmount]);
+  }, [canApprove, writeApprove, tokenAddress, tokenAmount]);
 
-  // 执行购买交易
+  // 执行质押交易
   const {
-    writeContract: writePurchase,
-    isPending: isPurchasing,
-    data: purchaseTxHash,
-    error: purchaseError,
+    writeContract: writeStake,
+    isPending: isStaking,
+    data: stakeTxHash,
+    error: stakeError,
   } = useWriteContract();
 
-  const canPurchase =
+  const canStake =
     enabled &&
     isConnected &&
     needsApprove === false &&
     !!tokenAddress &&
     !!tokenAmount &&
+    stakingPlanId !== undefined &&
     !!effectiveAccountAddress;
 
-  const purchase = useCallback(() => {
-    if (!canPurchase) return;
-    writePurchase({
+  const stake = useCallback(() => {
+    if (!canStake || stakingPlanId === undefined) return;
+    writeStake({
       address: tokenAddress as Address,
-      abi: tokenABI,
-      functionName: 'purchaseTokens',
-      args: [tokenAmount as bigint],
+      abi: tokenStakeABI,
+      functionName: 'stakeMint',
+      args: [stakingPlanId - BigInt(1), tokenAmount as bigint],
     });
-  }, [canPurchase, writePurchase, tokenAddress, tokenAmount]);
+  }, [canStake, writeStake, tokenAddress, stakingPlanId, tokenAmount]);
 
   return {
-    // 支付相关
-    usdtTokenAddress,
-    usdtDecimals,
-    usdtAmount,
-    usdtAllowance,
+    // 质押相关
+    stakingPlanId,
+    tokenAllowance,
     refetchAllowance,
     isLoadingAllowance,
     allowanceError,
 
-    // 授权/购买状态
+    // 授权/质押状态
     needsApprove,
     approve,
-    purchase,
+    stake,
     canApprove,
-    canPurchase,
+    canStake,
 
     isApproving,
     isWaitingApprove,
-    isPurchasing,
+    isStaking,
     approveTxHash,
-    purchaseTxHash,
+    stakeTxHash,
     approveError,
-    purchaseError,
+    stakeError,
   };
 }
-

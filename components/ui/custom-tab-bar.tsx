@@ -1,46 +1,18 @@
 import { Colors } from '@/config/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import React, { useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, View, Image } from 'react-native';
-
-// 定义所有图片资源
-const TAB_ICONS = {
-    market: require('@/assets/images/tabs/market.png'),
-    marketActive: require('@/assets/images/tabs/market-active.png'),
-    trade: require('@/assets/images/tabs/trade.png'),
-    tradeActive: require('@/assets/images/tabs/trade-active.png'),
-    message: require('@/assets/images/tabs/msg.png'),
-    messageActive: require('@/assets/images/tabs/msg-active.png'),
-    wallet: require('@/assets/images/tabs/wallet.png'),
-    walletActive: require('@/assets/images/tabs/wallet-active.png'),
-    profile: require('@/assets/images/tabs/profile.png'),
-    profileActive: require('@/assets/images/tabs/profile-active.png'),
-};
+import React from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import MsgIcon from '@/assets/images/tabs/msg.svg';
+import IndexIcon from '@/assets/images/tabs/index.svg';
+import TradeIcon from '@/assets/images/tabs/trade.svg';
+import ProfileIcon from '@/assets/images/tabs/profile.svg';
 
 export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     const { colorScheme } = useTheme();
     const colors = Colors[colorScheme ?? 'dark'];
     const isLight = colorScheme === 'light';
     const iconSize = 24;
-
-    // 预加载所有图片
-    useEffect(() => {
-        const preloadImages = async () => {
-            try {
-                const imageUris = Object.values(TAB_ICONS).map(iconSource => {
-                    const resolved = Image.resolveAssetSource(iconSource);
-                    return resolved?.uri;
-                }).filter(Boolean) as string[];
-
-                await Promise.all(imageUris.map(uri => Image.prefetch(uri)));
-            } catch (error) {
-                console.warn('Failed to preload tab bar images:', error);
-            }
-        };
-
-        preloadImages();
-    }, []);
 
 
     return (
@@ -59,7 +31,6 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
             >
                 {state.routes.map((route, index) => {
                     const { options } = descriptors[route.key];
-                    const label = options.tabBarLabel ?? options.title ?? route.name;
                     const isFocused = state.index === index;
 
                     const onPress = () => {
@@ -75,27 +46,21 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
                     };
 
                     const getIcon = () => {
-                        let iconSource;
+                        // 选中时使用主题色，未选中时使用灰色
+                        const iconColor = isFocused ? colors.primary : '#C4C4C4';
+
                         switch (route.name) {
                             case 'index':
-                                iconSource = isFocused ? TAB_ICONS.marketActive : TAB_ICONS.market;
-                                break;
+                                return <IndexIcon width={iconSize} height={iconSize} color={iconColor} />
                             case 'trade':
-                                iconSource = isFocused ? TAB_ICONS.tradeActive : TAB_ICONS.trade;
-                                break;
+                                return <TradeIcon width={iconSize} height={iconSize} color={iconColor} />
                             case 'message':
-                                iconSource = isFocused ? TAB_ICONS.messageActive : TAB_ICONS.message;
-                                break;
+                                return <MsgIcon width={iconSize} height={iconSize} color={iconColor} />
                             case 'wallet':
-                                iconSource = isFocused ? TAB_ICONS.walletActive : TAB_ICONS.wallet;
-                                break;
-                            case 'profile':
-                                iconSource = isFocused ? TAB_ICONS.profileActive : TAB_ICONS.profile;
-                                break;
+                                return <ProfileIcon width={iconSize} height={iconSize} color={iconColor} />
                             default:
-                                iconSource = TAB_ICONS.market;
+                                return <ProfileIcon width={iconSize} height={iconSize} color={iconColor} />
                         }
-                        return <Image source={iconSource} style={{ width: iconSize, height: iconSize }} resizeMode="contain" />;
                     }
 
                     return (

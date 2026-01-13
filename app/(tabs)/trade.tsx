@@ -1,4 +1,4 @@
-import { TouchableOpacity, View, Text, ScrollView, ActivityIndicator, Platform, Image, Animated, RefreshControl } from 'react-native';
+import { TouchableOpacity, View, Text, ScrollView, ActivityIndicator, Platform, Image, Animated, RefreshControl, Alert } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/config/theme';
@@ -11,6 +11,8 @@ import { useRouter } from 'expo-router';
 import { NetworkSelector, type Network } from '@/components/NetworkSelector';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatUnits } from 'viem';
+import { useSwitchChain, useAccount, useChainId } from 'wagmi';
+import * as Haptics from 'expo-haptics';
 
 type TabType = 'regular' | 'stake' | 'equity';
 
@@ -159,13 +161,34 @@ export default function TabTwoScreen() {
     { id: 7, name: 'Sepolia', chainId: 11155111 },
   ];
 
-  const [selectedNetwork, setSelectedNetwork] = useState<Network>(defaultNetworks[6]); // 默认选择 Sepolia
+  const { chainId } = useAccount();
+  const currentChainId = useChainId();
+  const { switchChainAsync } = useSwitchChain();
+
+  // 根据 chainId 获取当前选中的网络
+  const selectedNetwork = useMemo(() => {
+    const chainIdToUse = currentChainId || chainId;
+    if (!chainIdToUse) {
+      return defaultNetworks[6]; // 默认 Sepolia
+    }
+    return defaultNetworks.find(n => n.chainId === chainIdToUse) || defaultNetworks[6];
+  }, [currentChainId, chainId]);
 
   // 选择网络回调
-  const handleSelectNetwork = useCallback((network: Network) => {
-    setSelectedNetwork(network);
-    // 可以在这里添加其他逻辑，比如更新 API 请求参数等
-  }, []);
+  const handleSelectNetwork = useCallback(async (network: Network) => {
+    if (!switchChainAsync) {
+      Alert.alert('错误', '无法切换网络，请确保钱包已连接');
+      return;
+    }
+
+    try {
+      await switchChainAsync({ chainId: network.chainId as number });
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      console.error('切换网络失败:', error);
+      Alert.alert('切换失败', (error as Error)?.message || '请稍后重试');
+    }
+  }, [switchChainAsync]);
 
   // 获取代币列表的函数
   const fetchTokenList = useCallback(async (isRefresh = false) => {
