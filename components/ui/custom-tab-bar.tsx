@@ -1,6 +1,5 @@
 import { Colors } from '@/config/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import MsgIcon from '@/assets/images/tabs/msg.svg';
@@ -8,12 +7,24 @@ import IndexIcon from '@/assets/images/tabs/index.svg';
 import TradeIcon from '@/assets/images/tabs/trade.svg';
 import ProfileIcon from '@/assets/images/tabs/profile.svg';
 
-export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+type TabRouteKey = 'index' | 'trade' | 'message' | 'wallet';
+
+type TabRoute = {
+    key: TabRouteKey;
+    title?: string;
+};
+
+type CustomTabBarProps = {
+    index: number;
+    routes: TabRoute[];
+    onTabPress: (nextIndex: number) => void;
+};
+
+export function CustomTabBar({ index, routes, onTabPress }: CustomTabBarProps) {
     const { colorScheme } = useTheme();
     const colors = Colors[colorScheme ?? 'dark'];
     const isLight = colorScheme === 'light';
     const iconSize = 29;
-
 
     return (
         <View style={styles.container}>
@@ -29,54 +40,39 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
                     },
                 ]}
             >
-                {state.routes.map((route, index) => {
-                    const { options } = descriptors[route.key];
-                    const isFocused = state.index === index;
-
-                    const onPress = () => {
-                        const event = navigation.emit({
-                            type: 'tabPress',
-                            target: route.key,
-                            canPreventDefault: true,
-                        });
-
-                        if (!isFocused && !event.defaultPrevented) {
-                            navigation.navigate(route.name);
-                        }
-                    };
+                {routes.map((route, routeIndex) => {
+                    const isFocused = index === routeIndex;
 
                     const getIcon = () => {
-                        // 选中时使用主题色，未选中时使用灰色
                         const iconColor = isFocused ? colors.primary : '#C4C4C4';
 
-                        switch (route.name) {
+                        switch (route.key) {
                             case 'index':
-                                return <IndexIcon width={iconSize} height={iconSize} color={iconColor} />
+                                return <IndexIcon width={iconSize} height={iconSize} color={iconColor} />;
                             case 'trade':
-                                return <TradeIcon width={iconSize} height={iconSize} color={iconColor} />
+                                return <TradeIcon width={iconSize} height={iconSize} color={iconColor} />;
                             case 'message':
-                                return <MsgIcon width={iconSize} height={iconSize} color={iconColor} />
+                                return <MsgIcon width={iconSize} height={iconSize} color={iconColor} />;
                             case 'wallet':
-                                return <ProfileIcon width={iconSize} height={iconSize} color={iconColor} />
                             default:
-                                return <ProfileIcon width={iconSize} height={iconSize} color={iconColor} />
+                                return <ProfileIcon width={iconSize} height={iconSize} color={iconColor} />;
                         }
-                    }
+                    };
 
                     return (
                         <TouchableOpacity
                             key={route.key}
-                            onPress={onPress}
+                            onPress={() => onTabPress(routeIndex)}
                             style={styles.tabItem}
                             activeOpacity={0.7}
                         >
-                            <View style={[
-                                styles.tabContent,
-                                isFocused && styles.tabContentActive
-                            ]}>
-                                <View style={styles.iconWrapper}>
-                                    {getIcon()}
-                                </View>
+                            <View
+                                style={[
+                                    styles.tabContent,
+                                    isFocused && styles.tabContentActive,
+                                ]}
+                            >
+                                <View style={styles.iconWrapper}>{getIcon()}</View>
                             </View>
                         </TouchableOpacity>
                     );
@@ -105,7 +101,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.25,
         elevation: 18,
     },
-
     tabItem: {
         flex: 1,
         alignItems: 'center',

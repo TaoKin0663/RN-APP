@@ -1,41 +1,56 @@
-import { Tabs } from 'expo-router';
+import React from 'react';
+import { View, useWindowDimensions } from 'react-native';
+import { TabView } from 'react-native-tab-view';
 
 import { CustomTabBar } from '@/components/ui/custom-tab-bar';
-import { useTheme } from '@/hooks/use-theme';
+import HomeScreen from './index';
+import TradeScreen from './trade';
+import MessageScreen from './message';
+import WalletScreen from './wallet';
+
+type RouteKey = 'index' | 'trade' | 'message' | 'wallet';
+
+type Route = {
+  key: RouteKey;
+  title: string;
+};
+
+const routes: Route[] = [
+  { key: 'index', title: '首页' },
+  { key: 'trade', title: '交易' },
+  { key: 'message', title: '消息' },
+  { key: 'wallet', title: '钱包' },
+];
 
 export default function TabLayout() {
-  const { colorScheme } = useTheme();
+  const layout = useWindowDimensions();
+  const [index, setIndex] = React.useState(0);
+
+  const renderScene = ({ route }: { route: Route }) => {
+    switch (route.key) {
+      case 'index':
+        return <HomeScreen />;
+      case 'trade':
+        return <TradeScreen />;
+      case 'message':
+        return <MessageScreen />;
+      case 'wallet':
+        return <WalletScreen />;
+      default:
+        return null;
+    }
+  };
 
   return (
-    <Tabs
-      tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{
-        headerShown: false,
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: '首页',
-        }}
+    <View style={{ flex: 1 }}>
+      <TabView
+        navigationState={{ index, routes }}
+        renderScene={renderScene}
+        onIndexChange={setIndex}
+        initialLayout={{ width: layout.width }}
+        renderTabBar={() => null}
       />
-      <Tabs.Screen
-        name="trade"
-        options={{
-          title: '交易',
-        }}
-      />
-      <Tabs.Screen
-        name="message"
-        options={{
-          title: '消息',
-        }}
-      />
-      <Tabs.Screen
-        name="wallet"
-        options={{
-          title: '钱包',
-        }}
-      />
-    </Tabs>
+      <CustomTabBar index={index} routes={routes} onTabPress={setIndex} />
+    </View>
   );
 }
