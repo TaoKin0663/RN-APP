@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity, Alert, Animated, StyleSheet, ImageBackground } from "react-native"
+import { ThemedText } from '@/components/ThemedText';
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/hooks/use-theme";
@@ -991,53 +992,38 @@ export default function Wallet() {
             >
               {/* 左侧：头像和用户ID */}
               <View className="flex-1">
-                {/* 头像 */}
-                <View className="mb-3">
-                  {userInfo.avatar ? (
-                    <Image
-                      source={{ uri: userInfo.avatar }}
-                      style={{
-                        width: 56,
-                        height: 56,
-                        borderRadius: 28,
-                        borderWidth: 2,
-                        borderColor: 'rgba(255, 255, 255, 0.3)',
-                      }}
-                      contentFit="cover"
-                    />
-                  ) : (
-                    <View
-                      style={{
-                        width: 56,
-                        height: 56,
-                        borderRadius: 28,
-                        backgroundColor: colors.primary || colors.tint,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        borderWidth: 2,
-                        borderColor: 'rgba(255, 255, 255, 0.3)',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 24,
-                          fontWeight: '700',
-                          color: '#FFFFFF',
-                        }}
-                      >
-                        {userInfo.username?.charAt(0)?.toUpperCase() || 'U'}
-                      </Text>
-                    </View>
-                  )}
+                {/* 头像 + 用户名 */}
+                <View className="mb-3 flex-row items-center">
+                  <Image
+                    source={{ uri: userInfo.avatar }}
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 28,
+                      borderWidth: 2,
+                      borderColor: 'rgba(255, 255, 255, 0.3)',
+                    }}
+                    contentFit="cover"
+                  />
+                  <ThemedText
+                    className="ml-3"
+                    style={{
+                      fontSize: 16
+                    }}
+                  >
+                    {userInfo.username}
+                  </ThemedText>
                 </View>
                 {/* 用户ID */}
-                <View className="flex-row items-center">
-                  <Text className="text-sm mr-2" style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                    用户ID:
-                  </Text>
-                  <Text className="text-sm flex-1" style={{ color: '#FFFFFF', fontFamily: 'monospace' }}>
+                {/* <View className="flex-row items-center">
+                  <View>
+                    <ThemedText className="text-sm mr-2">
+                      用户ID:
+                    </ThemedText>
+                  </View>
+                  <ThemedText className="text-sm flex-1">
                     {userInfo.id || 'N/A'}
-                  </Text>
+                  </ThemedText>
                   <TouchableOpacity
                     onPress={() => {
                       if (userInfo.id) {
@@ -1048,9 +1034,9 @@ export default function Wallet() {
                     activeOpacity={0.7}
                     className="ml-2 p-1"
                   >
-                    <MaterialIcons name="content-copy" size={16} color="rgba(255, 255, 255, 0.8)" />
+                    <MaterialIcons name="content-copy" size={16} color={colors.textSecondary} />
                   </TouchableOpacity>
-                </View>
+                </View> */}
               </View>
             </View>
           </ImageBackground>
