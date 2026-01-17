@@ -1,5 +1,6 @@
 import React, { useRef, useCallback, useMemo } from 'react';
-import { TouchableOpacity, View, Text, Image } from 'react-native';
+import { TouchableOpacity, View, Text } from 'react-native';
+import { Image } from 'expo-image';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import {
   BottomSheetModal,
@@ -48,7 +49,7 @@ const chainIconMap: Record<number, any> = {
 // 获取链图标
 const getChainIconSource = (chainId: string | number | null | undefined) => {
   if (!chainId) return null;
-  
+
   let chainIdNumber: number;
   if (typeof chainId === 'string') {
     if (chainId.startsWith('0x') || chainId.startsWith('0X')) {
@@ -59,9 +60,9 @@ const getChainIconSource = (chainId: string | number | null | undefined) => {
   } else {
     chainIdNumber = chainId;
   }
-  
+
   if (isNaN(chainIdNumber)) return null;
-  
+
   return chainIconMap[chainIdNumber] || null;
 };
 
@@ -118,8 +119,7 @@ export function NetworkSelector({
       {getChainIconSource(selectedNetwork.chainId) ? (
         <Image
           source={getChainIconSource(selectedNetwork.chainId)}
-          style={{ width: 20, height: 20, borderRadius: 10 }}
-          resizeMode="cover"
+          style={{ width: 20, height: 20, borderRadius: 10, resizeMode: 'cover' }}
         />
       ) : (
         <View
@@ -209,8 +209,7 @@ export function NetworkSelector({
                   {getChainIconSource(network.chainId) ? (
                     <Image
                       source={getChainIconSource(network.chainId)}
-                      style={{ width: 40, height: 40, borderRadius: 20 }}
-                      resizeMode="cover"
+                      style={{ width: 40, height: 40, borderRadius: 20, resizeMode: 'cover' }}
                     />
                   ) : (
                     <View

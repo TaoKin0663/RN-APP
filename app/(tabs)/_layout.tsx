@@ -36,12 +36,6 @@ export default function TabLayout() {
           title: '钱包',
         }}
       />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: '个人',
-        }}
-      />
     </Tabs>
   );
 }

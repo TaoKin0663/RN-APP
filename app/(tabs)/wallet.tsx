@@ -1,16 +1,16 @@
 import { View, Text, TouchableOpacity, Alert, Animated, StyleSheet, ImageBackground } from "react-native"
 import { ThemedText } from '@/components/ThemedText';
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { RelativePathString, useRouter } from "expo-router";
 import { useTheme } from "@/hooks/use-theme";
 import { Colors } from "@/config/theme";
-import { useSwitchChain, useChainId, useDisconnect } from "wagmi";
+import { useSwitchChain, useChainId, useDisconnect, useAccount } from "wagmi";
 import { useAvatarGenerator } from "@/hooks/useAvatarGenerator";
 import Jazzicon from "react-native-jazzicon";
 import { formatAddress } from "@/utils/common";
 import { useMemo, useRef, useCallback, useState, useEffect } from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { useAppKit, useAccount } from '@reown/appkit-react-native';
+import { useAppKit } from '@reown/appkit-react-native';
 import { Image } from "expo-image";
 import { useUserStore } from "@/store";
 import {
@@ -736,7 +736,6 @@ export default function Wallet() {
     return defaultNetworks.find(n => n.chainId === chainIdToUse) || defaultNetworks[6];
   }, [currentChainId, chainId]);
 
-  // 切换网络的处理函数
   const handleSelectNetwork = useCallback(async (network: Network) => {
     if (!switchChainAsync) {
       Alert.alert('错误', '无法切换网络，请确保钱包已连接');
@@ -751,6 +750,12 @@ export default function Wallet() {
       Alert.alert('切换失败', (error as Error)?.message || '请稍后重试');
     }
   }, [switchChainAsync]);
+
+  const handlePressSettings = useCallback(() => {
+    router.push({
+      pathname: '/setting' as RelativePathString,
+    });
+  }, [router]);
 
   const allAddresses = useMemo(() => {
     const addresses: string[] = [];
@@ -921,6 +926,38 @@ export default function Wallet() {
     fetchTokenList();
   }, [fetchTokenList]);
 
+
+  // 链图标映射
+  const chainIconMap: Record<number, any> = {
+    1: require('@/assets/images/chain-icons/1.png'),
+    10: require('@/assets/images/chain-icons/10.png'),
+    56: require('@/assets/images/chain-icons/56.png'),
+    137: require('@/assets/images/chain-icons/137.png'),
+    8453: require('@/assets/images/chain-icons/8453.png'),
+    42161: require('@/assets/images/chain-icons/42161.png'),
+    11155111: require('@/assets/images/chain-icons/11155111.png'),
+  };
+
+  // 获取链图标
+  const getChainIconSource = (chainId: string | number | null | undefined) => {
+    if (!chainId) return null;
+
+    let chainIdNumber: number;
+    if (typeof chainId === 'string') {
+      if (chainId.startsWith('0x') || chainId.startsWith('0X')) {
+        chainIdNumber = parseInt(chainId, 16);
+      } else {
+        chainIdNumber = parseInt(chainId, 10);
+      }
+    } else {
+      chainIdNumber = chainId;
+    }
+
+    if (isNaN(chainIdNumber)) return null;
+
+    return chainIconMap[chainIdNumber] || null;
+  };
+
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
       {/* 顶部栏：左上角显示钱包地址和头像，右上角显示网络选择器 */}
@@ -960,9 +997,48 @@ export default function Wallet() {
               selectedNetwork={selectedNetwork}
               onSelectNetwork={handleSelectNetwork}
               networks={defaultNetworks}
+              triggerComponent={
+                <View className="flex-row items-center">
+                  {getChainIconSource(selectedNetwork.chainId) ? (
+                    <Image
+                      source={getChainIconSource(selectedNetwork.chainId)}
+                      style={{ width: 20, height: 20, borderRadius: 10, resizeMode: 'cover' }}
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
+                        backgroundColor: colors.background,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: colors.text,
+                          fontSize: 10,
+                          fontWeight: '600',
+                        }}
+                      >
+                        {selectedNetwork.name.charAt(0)}
+                      </Text>
+                    </View>
+                  )}
+                  <MaterialIcons name="arrow-drop-down" size={20} color={colors.text} />
+                </View>
+              }
             />
           )
         }
+        <TouchableOpacity
+          onPress={handlePressSettings}
+          activeOpacity={0.7}
+          className="ml-2 p-2"
+        >
+          <MaterialIcons name="settings" size={22} color={colors.text} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView

@@ -82,7 +82,11 @@ export default function SafeSettingsScreen() {
         <Stack.Screen
           options={{
             title: 'Safe 设置',
-            headerStyle: { backgroundColor: colors.background },
+            headerTitleAlign: 'center',
+            headerShadowVisible: false,
+            headerStyle: {
+              backgroundColor: colors.background,
+            },
             headerTintColor: colors.text,
           }}
         />

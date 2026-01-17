@@ -12,7 +12,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
     const { colorScheme } = useTheme();
     const colors = Colors[colorScheme ?? 'dark'];
     const isLight = colorScheme === 'light';
-    const iconSize = 24;
+    const iconSize = 29;
 
 
     return (
@@ -21,7 +21,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
                 style={[
                     styles.tabBar,
                     {
-                        backgroundColor: 'rgba(18, 13, 0, 0.9)',
+                        backgroundColor: isLight ? 'rgba(255, 255, 255, 0.9)' : 'rgba(18, 13, 0, 0.9)',
                         shadowColor: isLight ? colors.shadow : '#000',
                         shadowOpacity: isLight ? 0.08 : 0.3,
                         borderWidth: 0,
