@@ -1,4 +1,4 @@
-import { TouchableOpacity, View, Text, ScrollView, ActivityIndicator, Platform, Image, Animated, RefreshControl, Alert } from 'react-native';
+import { TouchableOpacity, View, Text, ScrollView, Platform, Image, Animated, RefreshControl, Alert } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/config/theme';
@@ -20,6 +20,120 @@ enum TokenType {
   REGULAR_BENEFITS = "REGULAR_BENEFITS",
   STAKE = "STAKE",
   EQUITY = "EQUITY",
+}
+
+type ThemeColors = typeof Colors.light;
+
+function TokenSkeleton({ colors }: { colors: ThemeColors }) {
+  return (
+    <View
+      className="rounded-xl p-4 mb-5"
+      style={{ backgroundColor: colors.backgroundSecondary }}
+    >
+      <View className="flex-row items-center justify-between mb-4">
+        <View className="flex-row items-center flex-1">
+          <View className="mr-3">
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: colors.backgroundTertiary,
+              }}
+            />
+          </View>
+          <View className="flex-1">
+            <View
+              style={{
+                width: 90,
+                height: 16,
+                borderRadius: 8,
+                backgroundColor: colors.backgroundTertiary,
+                marginBottom: 8,
+              }}
+            />
+            <View
+              style={{
+                width: 140,
+                height: 12,
+                borderRadius: 6,
+                backgroundColor: colors.backgroundTertiary,
+              }}
+            />
+          </View>
+        </View>
+        <View
+          style={{
+            width: 72,
+            height: 20,
+            borderRadius: 10,
+            backgroundColor: colors.backgroundTertiary,
+          }}
+        />
+      </View>
+
+      <View>
+        <View
+          style={{
+            width: 80,
+            height: 12,
+            borderRadius: 6,
+            backgroundColor: colors.backgroundTertiary,
+            marginBottom: 14,
+          }}
+        />
+        <View className="flex-row gap-3">
+          <View className="flex-1">
+            <View
+              style={{
+                width: '60%',
+                height: 12,
+                borderRadius: 6,
+                backgroundColor: colors.backgroundTertiary,
+                marginBottom: 8,
+              }}
+            />
+            <View
+              style={{
+                width: '50%',
+                height: 16,
+                borderRadius: 8,
+                backgroundColor: colors.backgroundTertiary,
+              }}
+            />
+          </View>
+          <View className="flex-1">
+            <View
+              style={{
+                width: '50%',
+                height: 12,
+                borderRadius: 6,
+                backgroundColor: colors.backgroundTertiary,
+                marginBottom: 8,
+              }}
+            />
+            <View
+              style={{
+                width: '40%',
+                height: 16,
+                borderRadius: 8,
+                backgroundColor: colors.backgroundTertiary,
+              }}
+            />
+          </View>
+        </View>
+        <View
+          style={{
+            width: 120,
+            height: 10,
+            borderRadius: 5,
+            backgroundColor: colors.backgroundTertiary,
+            marginTop: 12,
+          }}
+        />
+      </View>
+    </View>
+  );
 }
 
 function TokenItem({ token }: { token: IToken }) {
@@ -389,9 +503,10 @@ export default function TabTwoScreen() {
 
         {/* 代币卡片 */}
         {loading ? (
-          <View className="items-center justify-center py-10">
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text className="text-sm mt-4" style={{ color: colors.textSecondary }}>加载中...</Text>
+          <View>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <TokenSkeleton key={index} colors={colors} />
+            ))}
           </View>
         ) : error ? (
           <View className="items-center justify-center py-10">
