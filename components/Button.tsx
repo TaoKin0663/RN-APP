@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { TouchableOpacity, TouchableOpacityProps, Text, ViewStyle, TextStyle } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -23,6 +23,7 @@ type ButtonColor =
   | 'error';
 
 type ButtonVariant = 'solid' | 'outline';
+type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends Omit<TouchableOpacityProps, 'style' | 'className'> {
   children: React.ReactNode;
@@ -32,6 +33,7 @@ interface ButtonProps extends Omit<TouchableOpacityProps, 'style' | 'className'>
   enableHaptic?: boolean;
   color?: ButtonColor;
   variant?: ButtonVariant;
+  size?: ButtonSize;
   springConfig?: {
     damping?: number;
     stiffness?: number;
@@ -48,6 +50,7 @@ export function Button({
   springConfig,
   color,
   variant = 'solid',
+  size = 'md',
   onPress,
   ...props
 }: ButtonProps) {
@@ -80,14 +83,6 @@ export function Button({
   // 根据 variant 决定背景色和文字颜色
   const backgroundColor = variant === 'outline' ? 'transparent' : buttonColor;
   const finalTextColor = variant === 'outline' ? textColor : '#FFFFFF';
-
-  // 风格的弹簧配置：更柔和的弹跳效果
-  const defaultSpringConfig = {
-    damping: 20, // 阻尼，值越大回弹越少
-    stiffness: 300, // 刚度，控制动画速度
-    mass: 0.5, // 质量，影响惯性
-    ...springConfig,
-  };
 
   // 使用 useAnimatedReaction 在 UI 线程上平滑处理 disabled 状态变化
   useAnimatedReaction(
@@ -137,14 +132,8 @@ export function Button({
     }
   };
 
-  const handlePressOut = (event: any) => {
+  const handlePressOut = () => {
     if (props.disabled) return;
-    
-    // 松手时立即触发 onPress 回调，不等待 React Native 的 onPress 事件
-    // 这样可以减少延迟感，让响应更快
-    if (onPress && !props.disabled) {
-      onPress(event);
-    }
     
     // 松手时自然回弹效果：增加阻尼，减少弹跳，让动画更平滑
     scale.value = withSpring(1, {
@@ -178,11 +167,16 @@ export function Button({
   };
 
   // 构建默认的 className
+  const sizeClasses =
+    size === 'sm'
+      ? 'px-2 min-h-[28px] min-w-[40px]'
+      : size === 'lg'
+      ? 'px-4 min-h-[48px] min-w-[140px]'
+      : 'px-3 min-h-[40px] min-w-[120px]';
   const defaultClassName = [
     'items-center justify-center',
     'rounded-full',
-    'px-3',
-    'min-h-[40px] min-w-[120px]',
+    sizeClasses,
     variant === 'outline' ? 'border-[1.5px]' : '',
   ].filter(Boolean).join(' ');
   
@@ -203,6 +197,7 @@ export function Button({
       {...props}
       className={mergedClassName}
       style={[dynamicStyle, style, animatedStyle]}
+      onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       activeOpacity={1}
@@ -211,4 +206,3 @@ export function Button({
     </AnimatedTouchableOpacity>
   );
 }
-

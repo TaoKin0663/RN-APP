@@ -54,7 +54,7 @@ const metadata = {
   url: "https://reown.com/appkit",
   icons: ["https://avatars.githubusercontent.com/u/179229932"],
   redirect: {
-    native: "YOUR_APP_SCHEME://",
+    native: "appkitexpowagmi://",
     universal: "YOUR_APP_UNIVERSAL_LINK.com",
   },
 };

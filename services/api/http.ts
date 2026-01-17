@@ -221,7 +221,7 @@ export function createApiClient(baseURL: string): ApiClient {
 }
 
 // 导出常用服务实例
-export const defaultApi = createApiClient('http://192.168.31.20:3000');
+export const defaultApi = createApiClient('http://www.outletsrwa.com');
 // export const outletsApi = createApiClient('https://www.outletsrwa.com');
 
 
