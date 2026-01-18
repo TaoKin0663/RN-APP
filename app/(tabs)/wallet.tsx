@@ -754,7 +754,7 @@ export default function Wallet() {
         backdropComponent={renderBackdrop}
         backgroundStyle={{ backgroundColor: colors.background }}
         handleIndicatorStyle={{ backgroundColor: colors.textSecondary }}
-        animateOnMount={true}
+        animateOnMount={false}
         index={0}
       >
         <BottomSheetView style={{ paddingBottom: insets.bottom + 20 }}>

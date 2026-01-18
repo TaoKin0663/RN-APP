@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.taurusct.gitrwaapp"
     },
     "android": {
       "adaptiveIcon": {
@@ -35,7 +36,8 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "react-native-bottom-tabs"
     ],
     "experiments": {
       "typedRoutes": true

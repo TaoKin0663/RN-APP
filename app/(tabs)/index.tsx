@@ -12,7 +12,9 @@ import { ThemedView } from '@/components/ThemedView';
 import { WalletInfoView } from '@/components/WalletInfoView';
 import { reownDarkGray, reownOrange } from '@/constants/Colors';
 import { formatAddress } from '@/utils/common';
-
+import Test from "@/components/ui/Test"
+import {Button} from "@/components/Button"
+import { router } from 'expo-router';
 export default function HomeScreen() {
   const { address, isConnected } = useAccount();
 
@@ -39,6 +41,9 @@ export default function HomeScreen() {
             <ReownFigures />
           </View>
         }>
+          <Test></Test>
+          <Button onPress={() => router.push('/Test')}>测试</Button>
+          <View style={{height: 200}}></View>
         <ThemedView style={styles.titleContainer}>
           <ThemedText type="title">AppKit</ThemedText>
           <ThemedText type="subtitle">for React Native</ThemedText>

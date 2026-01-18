@@ -17,22 +17,6 @@ allprojects {
     google()
     mavenCentral()
     maven { url 'https://www.jitpack.io' }
-    maven { url "https://maven.sumsub.com/repository/maven-public/" }
-  }
-}
-
-// 为所有子项目配置 buildscript repositories，确保它们使用根项目的配置
-// 这样可以避免子项目（如 @authing/rn）使用已废弃的 jcenter
-subprojects {
-  beforeEvaluate { project ->
-    if (project.hasProperty('buildscript')) {
-      project.buildscript {
-        repositories {
-          google()
-          mavenCentral()
-        }
-      }
-    }
   }
 }
 

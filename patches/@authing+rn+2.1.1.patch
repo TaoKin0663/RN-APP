@@ -530,3 +530,17 @@ index 11ba7a6..0000000
 -		INJECTED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml
 -		ADDED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml
 -		INJECTED from /Users/zhongjiahui/github/authing-rn-sdk/android/src/main/AndroidManifest.xml
+diff --git a/node_modules/@authing/rn/ios/AuthingRnSdk.m b/node_modules/@authing/rn/ios/AuthingRnSdk.m
+index 70f60ba..5589f46 100644
+--- a/node_modules/@authing/rn/ios/AuthingRnSdk.m
++++ b/node_modules/@authing/rn/ios/AuthingRnSdk.m
+@@ -74,7 +74,8 @@ - (dispatch_queue_t)methodQueue
+     }];
+ }
+ 
+-RCT_EXPORT_METHOD(getVersion:(RCTPromiseResolveBlock)resolve) {
++RCT_EXPORT_METHOD(getVersion:(RCTPromiseResolveBlock)resolve
++                  rejecter:(RCTPromiseRejectBlock)reject) {
+     resolve(AlipaySDK.defaultService.currentVersion);
+ }
+ 

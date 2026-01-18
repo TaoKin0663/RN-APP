@@ -5,22 +5,12 @@ import Constants from 'expo-constants';
 import { useUserStore } from '@/store';
 import { useRouter, Stack } from 'expo-router';
 
-// 动态导入 AuthingGuard，避免在 Expo Go 中直接加载
-let AuthingGuard: any = null;
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
-
-if (!isExpoGo) {
-    // 不在 Expo Go 中，尝试加载 AuthingGuard（开发构建或生产环境）
-    try {
-        const authingModule = require('@authing/rn');
-        AuthingGuard = authingModule.AuthingGuard;
-    } catch (error) {
-        console.warn('Authing SDK not available:', error);
-    }
-}
 
 export default function Login() {
     const [isReady, setIsReady] = useState(false);
+    const [authingGuardComponent, setAuthingGuardComponent] = useState<any>(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const { login } = useUserStore();
     const router = useRouter();
     const appId = '691a983b0804127b385ada81';
@@ -70,25 +60,56 @@ export default function Login() {
     };
 
     useEffect(() => {
-        // 检查是否可以使用 Authing SDK
-        console.log('=== Authing SDK Debug Info ===');
-        console.log('Execution Environment:', Constants.executionEnvironment);
-        console.log('Is Expo Go:', isExpoGo);
-        console.log('AuthingGuard available:', !!AuthingGuard);
+        let cancelled = false;
 
-        if (AuthingGuard) {
-            console.log('AuthingGuard loaded successfully');
-            setIsReady(true);
-        } else {
-            console.warn('AuthingGuard not available');
-            // 如果不在 Expo Go 中但 AuthingGuard 还是 null，可能是模块加载失败
-            if (!isExpoGo) {
-                console.error('Development build detected but AuthingGuard failed to load. Check if react-native-webview is properly installed.');
+        (async () => {
+            setLoadError(null);
+            setIsReady(false);
+
+            if (isExpoGo) {
+                if (!cancelled) {
+                    setLoadError('Authing SDK 需要开发构建（Expo Go 不支持）。');
+                }
+                return;
             }
-        }
+
+            try {
+                const authingModule: any = require('@authing/rn');
+                const Guard =
+                    authingModule?.AuthingGuard ??
+                    authingModule?.default?.AuthingGuard ??
+                    authingModule?.default ??
+                    authingModule;
+
+                if (!Guard) {
+                    throw new Error('AuthingGuard export is empty');
+                }
+
+                if (!cancelled) {
+                    setAuthingGuardComponent(() => Guard);
+                    setIsReady(true);
+                }
+            } catch (error: any) {
+                const message = error?.message ? String(error.message) : String(error);
+                const suggestion =
+                    message.includes('RNCWebViewModule') ||
+                    message.includes('RNCWebView') ||
+                    message.includes('TurboModuleRegistry')
+                        ? '当前安装到设备的开发构建缺少 react-native-webview 原生模块，请重新构建并安装：npx expo run:android --device 或 npx expo run:ios --device。'
+                        : null;
+                if (!cancelled) {
+                    setLoadError(suggestion ? `${message}\n\n${suggestion}` : message);
+                    setAuthingGuardComponent(null);
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
-    if (!isReady || !AuthingGuard) {
+    if (!isReady || !authingGuardComponent) {
         return (
             <>
                 {/* <StatusBar barStyle="dark-content" /> */}
@@ -112,11 +133,18 @@ export default function Login() {
                         <Text style={{ fontSize: 12, textAlign: 'center', color: '#999', marginTop: 10 }}>
                             npx expo run:android{'\n'}或{'\n'}npx expo run:ios
                         </Text>
+                        {!!loadError && (
+                            <Text style={{ fontSize: 12, textAlign: 'center', color: '#B91C1C', marginTop: 12 }}>
+                                {loadError}
+                            </Text>
+                        )}
                     </View>
                 </SafeAreaView>
             </>
         );
     }
+
+    const AuthingGuard = authingGuardComponent;
 
     return (
         <>

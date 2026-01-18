@@ -74,11 +74,15 @@ type Owner = {
 };
 
 // 删除按钮组件，使用 reanimated 实现 Q 弹效果
-const DeleteButton = React.memo<{
+const DeleteButton = React.memo(function DeleteButton({
+    translation,
+    onPress,
+    errorColor,
+}: {
     translation: SharedValue<number>;
     onPress: () => void;
     errorColor: string;
-}>(({ translation, onPress, errorColor }) => {
+}) {
     const deleteButtonScale = useSharedValue(1);
 
     const animatedStyle = useAnimatedStyle(() => {
@@ -150,7 +154,14 @@ const DeleteButton = React.memo<{
 });
 
 // Owner 列表项组件，独立使用 hooks
-const OwnerItem = React.memo<{
+const OwnerItem = React.memo(function OwnerItem({
+    owner,
+    index,
+    avatar,
+    canRemove,
+    colors,
+    onRemove,
+}: {
     owner: Owner;
     index: number;
     avatar: number | null;
@@ -158,7 +169,7 @@ const OwnerItem = React.memo<{
     address: string | undefined;
     colors: typeof Colors.light;
     onRemove: (index: number) => void;
-}>(({ owner, index, avatar, canRemove, colors, onRemove }) => {
+}) {
     const swipeableRef = useRef<SwipeableMethods>(null);
 
     const renderRightActions = (
@@ -248,7 +259,7 @@ export default function NewSafe() {
     const { generateAvatar } = useAvatarGenerator();
 
     // BottomSheet 模糊遮罩组件 - 兼容 Android 和 iOS
-    const BlurBackdrop = React.memo((props: BottomSheetBackdropProps) => {
+    const BlurBackdrop = React.memo(function BlurBackdrop(props: BottomSheetBackdropProps) {
         const { animatedIndex } = props;
 
         // 使用 Reanimated 创建动画样式
@@ -1079,4 +1090,3 @@ export default function NewSafe() {
         </SafeAreaView>
     );
 }
-

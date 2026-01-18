@@ -45,6 +45,7 @@ export default function SettingScreen() {
           backgroundColor: colors.background,
         },
         headerTintColor: colors.text,
+        headerBackTitle:"返回",
       }} />
       <View className="flex-1 px-4 pt-4 justify-between">
         <View>
