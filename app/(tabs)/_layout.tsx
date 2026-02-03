@@ -1,9 +1,5 @@
 import React from 'react';
-import { View, useWindowDimensions } from 'react-native';
-// import { TabView } from 'react-native-tab-view';
-
-// import { CustomTabBar } from '@/components/ui/custom-tab-bar';
-// import { createNativeBottomTabNavigator } from '@react-navigation/bottom-tabs/unstable';
+import { View } from 'react-native';
 import { withLayoutContext } from 'expo-router';
 import {
   createNativeBottomTabNavigator,
@@ -12,32 +8,8 @@ import {
 } from '@bottom-tabs/react-navigation';
 import { ParamListBase, TabNavigationState } from '@react-navigation/native';
 
-// import HomeScreen from './index';
-// import TradeScreen from './trade';
-// import MessageScreen from './message';
-// import WalletScreen from './wallet';
-// import MsgIcon from '@/assets/images/tabs/msg.svg';
-// import IndexIcon from '@/assets/images/tabs/index.svg';
-// import TradeIcon from '@/assets/images/tabs/trade.svg';
-// import ProfileIcon from '@/assets/images/tabs/profile.svg';
-
-type RouteKey = 'index' | 'trade' | 'message' | 'wallet';
-
-type Route = {
-  key: RouteKey;
-  title: string;
-};
-
-const routes: Route[] = [
-  { key: 'index', title: '首页' },
-  { key: 'trade', title: '交易' },
-  { key: 'message', title: '消息' },
-  { key: 'wallet', title: '钱包' },
-];
 
 export default function TabLayout() {
-  const layout = useWindowDimensions();
-  const [index, setIndex] = React.useState(0);
   const BottomTabNavigator = createNativeBottomTabNavigator().Navigator;
   const Tabs = withLayoutContext<
     NativeBottomTabNavigationOptions,
@@ -46,21 +18,6 @@ export default function TabLayout() {
     NativeBottomTabNavigationEventMap
   >(BottomTabNavigator);
 
-  // const renderScene = ({ route }: { route: Route }) => {
-  //   switch (route.key) {
-  //     case 'index':
-  //       return <HomeScreen />;
-  //     case 'trade':
-  //       return <TradeScreen />;
-  //     case 'message':
-  //       return <MessageScreen />;
-  //     case 'wallet':
-  //       return <WalletScreen />;
-  //     default:
-  //       return null;
-  //   }
-  // };
-  const size = 20;
   return (
     <View style={{ flex: 1 }}>
       <Tabs>
@@ -85,14 +42,6 @@ export default function TabLayout() {
             tabBarIcon: () => ({ sfSymbol: "wallet.pass.fill" }),
           }} />
       </Tabs>
-      {/* <TabView
-        navigationState={{ index, routes }}
-        renderScene={renderScene}
-        onIndexChange={setIndex}
-        initialLayout={{ width: layout.width }}
-        renderTabBar={() => null}
-      />
-      <CustomTabBar index={index} routes={routes} onTabPress={setIndex} /> */}
     </View>
   );
 }
